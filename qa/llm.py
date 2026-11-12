@@ -15,7 +15,7 @@ from .scorecard import ORDER, rubric_text
 
 PROVIDERS = {
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.5-flash"),
-    "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    "groq": ("https://api.groq.com/openai/v1", "openai/gpt-oss-120b"),
     "openai": (None, "gpt-4o-mini"),
     "openrouter": ("https://openrouter.ai/api/v1", "google/gemini-2.5-flash"),
     "anthropic": ("https://api.anthropic.com/v1/", None),
@@ -82,8 +82,14 @@ def chat_json(system, user, temperature=0.0, retries=2, max_tokens=2500):
     cl = client(cfg)
     gemini = cfg["provider"] == "gemini" or "gemini" in (cfg["model"] or "")
     # Gemini 2.5 counts its hidden "thinking" against max_tokens, which can leave an empty reply; switch thinking off.
-    extra = {"reasoning_effort": "none"} if gemini and "pro" not in cfg["model"] else {}
-    max_tokens = max(max_tokens, 4000) if gemini else max_tokens
+    oss = "gpt-oss" in (cfg["model"] or "")
+    if gemini and "pro" not in cfg["model"]:
+        extra = {"reasoning_effort": "none"}
+    elif oss:  # gpt-oss always reasons; keep it short so the answer fits
+        extra = {"reasoning_effort": "low"}
+    else:
+        extra = {}
+    max_tokens = max(max_tokens, 4000) if (gemini or oss) else max_tokens
     last = None
     for attempt in range(retries):
         try:
