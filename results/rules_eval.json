@@ -1,0 +1,539 @@
+{
+ "mode": "rules",
+ "model": null,
+ "overall": {
+  "n_calls": 110,
+  "per_param": {
+   "P1": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 0,
+    "tn": 98,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 12
+   },
+   "P2": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "tn": 107,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 3
+   },
+   "P3": {
+    "tp": 43,
+    "fp": 0,
+    "fn": 0,
+    "tn": 67,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 43
+   },
+   "P4": {
+    "tp": 22,
+    "fp": 0,
+    "fn": 0,
+    "tn": 88,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 22
+   },
+   "P5": {
+    "tp": 30,
+    "fp": 0,
+    "fn": 0,
+    "tn": 80,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 30
+   },
+   "P6": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "tn": 101,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 9
+   },
+   "P7": {
+    "tp": 24,
+    "fp": 0,
+    "fn": 0,
+    "tn": 86,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 24
+   },
+   "P8": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "tn": 101,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 9
+   },
+   "P9": {
+    "tp": 27,
+    "fp": 0,
+    "fn": 0,
+    "tn": 83,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 27
+   },
+   "P10": {
+    "tp": 43,
+    "fp": 0,
+    "fn": 0,
+    "tn": 67,
+    "precision": 1.0,
+    "recall": 1.0,
+    "support": 43
+   }
+  },
+  "fatal_param_recall": 1.0,
+  "fatal_param_precision": 1.0,
+  "fatal_call_recall": 1.0,
+  "fatal_calls": 40,
+  "fatal_calls_missed": [],
+  "fatal_false_alarms": [],
+  "flag_precision": 1.0,
+  "parameter_agreement": 1.0,
+  "score_mae": 0.0,
+  "exact_score": 1.0
+ },
+ "by_language": {
+  "English": {
+   "n_calls": 33,
+   "per_param": {
+    "P1": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 30,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 3
+    },
+    "P2": {
+     "tp": 1,
+     "fp": 0,
+     "fn": 0,
+     "tn": 32,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 1
+    },
+    "P3": {
+     "tp": 16,
+     "fp": 0,
+     "fn": 0,
+     "tn": 17,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 16
+    },
+    "P4": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 0,
+     "tn": 26,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 7
+    },
+    "P5": {
+     "tp": 12,
+     "fp": 0,
+     "fn": 0,
+     "tn": 21,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 12
+    },
+    "P6": {
+     "tp": 2,
+     "fp": 0,
+     "fn": 0,
+     "tn": 31,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 2
+    },
+    "P7": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 0,
+     "tn": 29,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 4
+    },
+    "P8": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 0,
+     "tn": 30,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 3
+    },
+    "P9": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 0,
+     "tn": 26,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 7
+    },
+    "P10": {
+     "tp": 17,
+     "fp": 0,
+     "fn": 0,
+     "tn": 16,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 17
+    }
+   },
+   "fatal_param_recall": 1.0,
+   "fatal_param_precision": 1.0,
+   "fatal_call_recall": 1.0,
+   "fatal_calls": 15,
+   "fatal_calls_missed": [],
+   "fatal_false_alarms": [],
+   "flag_precision": 1.0,
+   "parameter_agreement": 1.0,
+   "score_mae": 0.0,
+   "exact_score": 1.0
+  },
+  "Hinglish": {
+   "n_calls": 77,
+   "per_param": {
+    "P1": {
+     "tp": 9,
+     "fp": 0,
+     "fn": 0,
+     "tn": 68,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 9
+    },
+    "P2": {
+     "tp": 2,
+     "fp": 0,
+     "fn": 0,
+     "tn": 75,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 2
+    },
+    "P3": {
+     "tp": 27,
+     "fp": 0,
+     "fn": 0,
+     "tn": 50,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 27
+    },
+    "P4": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 0,
+     "tn": 62,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 15
+    },
+    "P5": {
+     "tp": 18,
+     "fp": 0,
+     "fn": 0,
+     "tn": 59,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 18
+    },
+    "P6": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 0,
+     "tn": 70,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 7
+    },
+    "P7": {
+     "tp": 20,
+     "fp": 0,
+     "fn": 0,
+     "tn": 57,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 20
+    },
+    "P8": {
+     "tp": 6,
+     "fp": 0,
+     "fn": 0,
+     "tn": 71,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 6
+    },
+    "P9": {
+     "tp": 20,
+     "fp": 0,
+     "fn": 0,
+     "tn": 57,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 20
+    },
+    "P10": {
+     "tp": 26,
+     "fp": 0,
+     "fn": 0,
+     "tn": 51,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 26
+    }
+   },
+   "fatal_param_recall": 1.0,
+   "fatal_param_precision": 1.0,
+   "fatal_call_recall": 1.0,
+   "fatal_calls": 25,
+   "fatal_calls_missed": [],
+   "fatal_false_alarms": [],
+   "flag_precision": 1.0,
+   "parameter_agreement": 1.0,
+   "score_mae": 0.0,
+   "exact_score": 1.0
+  }
+ },
+ "by_agent_gender": {
+  "F": {
+   "n_calls": 69,
+   "per_param": {
+    "P1": {
+     "tp": 6,
+     "fp": 0,
+     "fn": 0,
+     "tn": 63,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 6
+    },
+    "P2": {
+     "tp": 2,
+     "fp": 0,
+     "fn": 0,
+     "tn": 67,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 2
+    },
+    "P3": {
+     "tp": 24,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 24
+    },
+    "P4": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 0,
+     "tn": 54,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 15
+    },
+    "P5": {
+     "tp": 20,
+     "fp": 0,
+     "fn": 0,
+     "tn": 49,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 20
+    },
+    "P6": {
+     "tp": 8,
+     "fp": 0,
+     "fn": 0,
+     "tn": 61,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 8
+    },
+    "P7": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 0,
+     "tn": 54,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 15
+    },
+    "P8": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 0,
+     "tn": 65,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 4
+    },
+    "P9": {
+     "tp": 15,
+     "fp": 0,
+     "fn": 0,
+     "tn": 54,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 15
+    },
+    "P10": {
+     "tp": 24,
+     "fp": 0,
+     "fn": 0,
+     "tn": 45,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 24
+    }
+   },
+   "fatal_param_recall": 1.0,
+   "fatal_param_precision": 1.0,
+   "fatal_call_recall": 1.0,
+   "fatal_calls": 29,
+   "fatal_calls_missed": [],
+   "fatal_false_alarms": [],
+   "flag_precision": 1.0,
+   "parameter_agreement": 1.0,
+   "score_mae": 0.0,
+   "exact_score": 1.0
+  },
+  "M": {
+   "n_calls": 41,
+   "per_param": {
+    "P1": {
+     "tp": 6,
+     "fp": 0,
+     "fn": 0,
+     "tn": 35,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 6
+    },
+    "P2": {
+     "tp": 1,
+     "fp": 0,
+     "fn": 0,
+     "tn": 40,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 1
+    },
+    "P3": {
+     "tp": 19,
+     "fp": 0,
+     "fn": 0,
+     "tn": 22,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 19
+    },
+    "P4": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 0,
+     "tn": 34,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 7
+    },
+    "P5": {
+     "tp": 10,
+     "fp": 0,
+     "fn": 0,
+     "tn": 31,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 10
+    },
+    "P6": {
+     "tp": 1,
+     "fp": 0,
+     "fn": 0,
+     "tn": 40,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 1
+    },
+    "P7": {
+     "tp": 9,
+     "fp": 0,
+     "fn": 0,
+     "tn": 32,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 9
+    },
+    "P8": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 0,
+     "tn": 36,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 5
+    },
+    "P9": {
+     "tp": 12,
+     "fp": 0,
+     "fn": 0,
+     "tn": 29,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 12
+    },
+    "P10": {
+     "tp": 19,
+     "fp": 0,
+     "fn": 0,
+     "tn": 22,
+     "precision": 1.0,
+     "recall": 1.0,
+     "support": 19
+    }
+   },
+   "fatal_param_recall": 1.0,
+   "fatal_param_precision": 1.0,
+   "fatal_call_recall": 1.0,
+   "fatal_calls": 11,
+   "fatal_calls_missed": [],
+   "fatal_false_alarms": [],
+   "flag_precision": 1.0,
+   "parameter_agreement": 1.0,
+   "score_mae": 0.0,
+   "exact_score": 1.0
+  }
+ },
+ "review_rate": 0.0,
+ "seconds_per_call": 0.0034733923998746005,
+ "avg_tokens": {
+  "prompt": 0.0,
+  "completion": 0.0
+ }
+}

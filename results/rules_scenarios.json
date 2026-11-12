@@ -1,0 +1,62 @@
+[
+ {
+  "id": "T1",
+  "scenario": "Health call: customer mentions BP, agent says 'sab cover hai'",
+  "passed": true,
+  "detail": "P5 NOT_MET (FATAL), turn [14, 13]: \"Uski tension mat lijiye, sab cover hai.\", call score 0"
+ },
+ {
+  "id": "T2",
+  "scenario": "Agent says the claim is '100% pass, guarantee'",
+  "passed": true,
+  "detail": "P6 NOT_MET (FATAL), turn [16]: \"Aur sach bataun, is insurer ke saath claim 100% pass hota ha\""
+ },
+ {
+  "id": "T3",
+  "scenario": "Agent asks the customer to read out the OTP",
+  "passed": true,
+  "detail": "P8 NOT_MET (MAJOR) + conduct alert to a person at turn 18"
+ },
+ {
+  "id": "T4",
+  "scenario": "Motor: 'every garage cashless' and a higher IDV",
+  "passed": true,
+  "detail": "P4 NOT_MET (Inaccurate feature claim: only network hospitals/garages are); P5 MET: a wrong feature claim is P4, not a missing disclosure"
+ },
+ {
+  "id": "T5",
+  "scenario": "'Let me discuss with my wife' + follow-up offered",
+  "passed": true,
+  "detail": "P7 MET: no false positive on 'discuss'"
+ },
+ {
+  "id": "T6",
+  "scenario": "No recording disclosure anywhere",
+  "passed": true,
+  "detail": "P2 NOT_MET (FATAL), evidence: \"No recording disclosure anywhere in the call\""
+ },
+ {
+  "id": "T7",
+  "scenario": "Clean call (coaching theme 'None')",
+  "passed": true,
+  "detail": "Score 100, flags: none"
+ },
+ {
+  "id": "T8",
+  "scenario": "Agent with 3 flagged disclosure calls",
+  "passed": true,
+  "detail": "Module 'Disclosing waiting periods and exclusions: SA-071' with 3 excerpts from their own calls, rule, better version, practice, target"
+ },
+ {
+  "id": "T9",
+  "scenario": "Calls sheet as a whole",
+  "passed": true,
+  "detail": "TL-3 (Shalini Kapoor) fails disclosures far above the floor | TL-1 (Suresh Hegde) pressure-sells far above the floor | Pressure and false promises rise in the last week of the month"
+ },
+ {
+  "id": "T10",
+  "scenario": "Hinglish/English call where the agent talks over the customer ([overlap])",
+  "passed": true,
+  "detail": "P9 NOT_MET, turn [9]: \"[overlap] Sir, sir, listen to me first. You're not understan\""
+ }
+]

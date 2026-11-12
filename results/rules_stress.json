@@ -1,0 +1,209 @@
+[
+ {
+  "case": "S01",
+  "about": "Hinglish paraphrase: illness answered with 'sab aa jata hai' (P5 fatal)",
+  "param": "P5",
+  "expected": "NOT_MET",
+  "got": "NOT_MET",
+  "correct": true,
+  "reason": "Absence: mandatory disclosures missing before payment: initial waiting, specific-illness waiting, pre-existing disease waiting"
+ },
+ {
+  "case": "S02",
+  "about": "English paraphrase of a claim guarantee (P6 fatal)",
+  "param": "P6",
+  "expected": "NOT_MET",
+  "got": "MET",
+  "correct": false,
+  "reason": "No guarantees or promised returns"
+ },
+ {
+  "case": "S03",
+  "about": "Pressure without the usual words (P7)",
+  "param": "P7",
+  "expected": "NOT_MET",
+  "got": "MET",
+  "correct": false,
+  "reason": "Customer's wish to think/consult was respected"
+ },
+ {
+  "case": "S04",
+  "about": "Harmless 'covered' for a benefit that is covered (P5 must stay MET)",
+  "param": "P5",
+  "expected": "MET",
+  "got": "REVIEW",
+  "correct": false,
+  "reason": "Reassurance phrase found but context unclear (may be true for this benefit): send to a human"
+ },
+ {
+  "case": "S04",
+  "about": "Harmless 'covered' for a benefit that is covered (P5 must stay MET)",
+  "param": "P7",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Customer's wish to think/consult was respected and a follow-up offered"
+ },
+ {
+  "case": "S05",
+  "about": "T5: 'discuss with my wife' and a follow-up is NOT pressure",
+  "param": "P7",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Customer's wish to think/consult was respected and a follow-up offered"
+ },
+ {
+  "case": "S06",
+  "about": "OTP request worded without 'OTP' (P8 + conduct alert)",
+  "param": "P8",
+  "expected": "NOT_MET",
+  "got": "MET",
+  "correct": false,
+  "reason": "Premium stated with GST; payment via secure link"
+ },
+ {
+  "case": "S07",
+  "about": "Negated guarantee is compliant (P6 MET)",
+  "param": "P6",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "No guarantees or promised returns"
+ },
+ {
+  "case": "S08",
+  "about": "Recording disclosed only after personal details (P2 fatal)",
+  "param": "P2",
+  "expected": "NOT_MET",
+  "got": "NOT_MET",
+  "correct": true,
+  "reason": "Recording disclosed at turn 4, after the customer shared personal details at turn 3"
+ },
+ {
+  "case": "S09",
+  "about": "Interrupting without the [overlap] marker (P9)",
+  "param": "P9",
+  "expected": "NOT_MET",
+  "got": "MET",
+  "correct": false,
+  "reason": "No interruptions or dismissive language"
+ },
+ {
+  "case": "S10",
+  "about": "T4: motor, every garage cashless and a higher IDV is P4, not P5",
+  "param": "P4",
+  "expected": "NOT_MET",
+  "got": "NOT_MET",
+  "correct": true,
+  "reason": "Inaccurate feature claim: only network hospitals/garages are cashless"
+ },
+ {
+  "case": "S10",
+  "about": "T4: motor, every garage cashless and a higher IDV is P4, not P5",
+  "param": "P5",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Required disclosures given before payment"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P1",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Name and company given"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P2",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Recording disclosed before any personal details"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P3",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "3 need-analysis questions before recommending"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P4",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "No inaccurate feature claim detected (sum insured / IDV vs quote not checkable without the quote)"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P5",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Required disclosures given before payment"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P6",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "No guarantees or promised returns"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P7",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Customer's wish to think/consult was respected and a follow-up offered"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P9",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "No interruptions or dismissive language"
+ },
+ {
+  "case": "S11",
+  "about": "Clean Hinglish call (no flags)",
+  "param": "P10",
+  "expected": "MET",
+  "got": "MET",
+  "correct": true,
+  "reason": "Summary and next steps given"
+ },
+ {
+  "case": "S12",
+  "about": "Pre-existing illness covered 'from day one' (P6 and P5)",
+  "param": "P5",
+  "expected": "NOT_MET",
+  "got": "NOT_MET",
+  "correct": true,
+  "reason": "Misstated limits in reply to the customer's question (turn 3: \"Haan. Mujhe thyroid hai, woh cover hoga?\")"
+ },
+ {
+  "case": "S12",
+  "about": "Pre-existing illness covered 'from day one' (P6 and P5)",
+  "param": "P6",
+  "expected": "NOT_MET",
+  "got": "NOT_MET",
+  "correct": true,
+  "reason": "False promise about claims, returns or benefits"
+ }
+]
