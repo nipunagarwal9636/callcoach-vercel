@@ -66,29 +66,53 @@ def _parse_json(text):
         raise
 
 
-def chat_json(system, user, temperature=0.0, retries=3, max_tokens=2500):
+def _friendly(e):
+    t = str(e)
+    if "401" in t or "API key not valid" in t or "invalid_api_key" in t or "PERMISSION_DENIED" in t:
+        return "the API key was rejected. Check LLM_API_KEY on Vercel (no quotes, no spaces) and redeploy"
+    if "429" in t or "RESOURCE_EXHAUSTED" in t or "quota" in t.lower():
+        return "the free-tier rate limit was hit. Wait a minute and try again"
+    if "404" in t and "model" in t.lower():
+        return "the model name wasn't found. Remove LLM_MODEL on Vercel or set a valid one"
+    return t[:200]
+
+
+def chat_json(system, user, temperature=0.0, retries=2, max_tokens=2500):
     cfg = config()
     cl = client(cfg)
+    gemini = cfg["provider"] == "gemini" or "gemini" in (cfg["model"] or "")
+    # Gemini 2.5 counts its hidden "thinking" against max_tokens, which can leave an empty reply; switch thinking off.
+    extra = {"reasoning_effort": "none"} if gemini and "pro" not in cfg["model"] else {}
+    max_tokens = max(max_tokens, 4000) if gemini else max_tokens
     last = None
     for attempt in range(retries):
         try:
             kw = dict(model=cfg["model"], temperature=temperature, max_tokens=max_tokens,
-                      messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+                      messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], **extra)
             try:
                 resp = cl.chat.completions.create(response_format={"type": "json_object"}, **kw)
-            except Exception as e:  # some providers reject response_format
-                if "response_format" in str(e) or "json" in str(e).lower():
+            except Exception as e:  # some providers reject response_format or reasoning_effort
+                t = str(e)
+                if "reasoning" in t:
+                    kw.pop("reasoning_effort", None); extra.clear()
+                    resp = cl.chat.completions.create(response_format={"type": "json_object"}, **kw)
+                elif "response_format" in t or "json" in t.lower():
                     resp = cl.chat.completions.create(**kw)
                 else:
                     raise
-            out = _parse_json(resp.choices[0].message.content)
+            content = resp.choices[0].message.content
+            if not content:
+                raise RuntimeError(f"empty reply from the model (finish reason: {resp.choices[0].finish_reason})")
+            out = _parse_json(content)
             usage = getattr(resp, "usage", None)
             out["_usage"] = dict(prompt=getattr(usage, "prompt_tokens", 0), completion=getattr(usage, "completion_tokens", 0)) if usage else {}
             return out
         except Exception as e:
             last = e
-            time.sleep(2 * (attempt + 1) + (8 if "429" in str(e) else 0))
-    raise RuntimeError(f"LLM call failed: {last}")
+            if "401" in str(e) or "API key not valid" in str(e):
+                break
+            time.sleep(2 + (6 if "429" in str(e) else 0))
+    raise RuntimeError(f"AI call failed: {_friendly(last)}")
 
 
 JUDGE_SYSTEM = """You are a senior QA auditor at PolicyNest Insurance Brokers, an Indian health and motor insurance broker.
