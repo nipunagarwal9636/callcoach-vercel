@@ -24,7 +24,7 @@ STT_MODELS = {"groq": "whisper-large-v3-turbo", "openai": "whisper-1"}
 
 
 def _setting(name, default=None):
-    v = os.environ.get(name)
+    v = (os.environ.get(name) or "").strip().strip('"').strip("'").strip()
     if v:
         return v
     try:
