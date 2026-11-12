@@ -1,6 +1,11 @@
 from http.server import BaseHTTPRequestHandler
 
-from _util import read_json, send
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from qa.web import read_json, send  # noqa: E402
 from qa import llm
 from qa.coaching import BETTER, _llm_personalise, guardrail
 

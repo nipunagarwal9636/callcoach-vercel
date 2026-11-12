@@ -1,7 +1,12 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import unquote
 
-from _util import send
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from qa.web import send  # noqa: E402
 from qa.stt import transcribe
 
 
