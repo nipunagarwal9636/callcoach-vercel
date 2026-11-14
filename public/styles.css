@@ -639,3 +639,15 @@ body.flash-major::before { box-shadow: inset 0 0 0 8px var(--major); }
 @media (prefers-reduced-motion: reduce) { .light.fatal { animation: none; } body.flash-fatal::before, body.flash-major::before { animation: none; opacity: 0; } }
 .msg-flag.major, .msg-flag.minor { background: var(--major-soft); color: #8E4F0D; }
 .lv-line .msg-flag { margin-right: 4px; }
+.setup { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+.setup-o { flex: 1 1 280px; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 14px; display: grid; gap: 3px; cursor: pointer; }
+.setup-o span { font-size: 13px; color: var(--ink-2); } .setup-o.on { border-color: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); }
+#lv-howto { align-self: center; }
+.vu { display: block; width: 160px; height: 8px; background: #E8ECF3; border-radius: 4px; overflow: hidden; margin-left: auto; }
+.vu i { display: block; height: 100%; width: 0; background: var(--pass); transition: width .06s; }
+.vu.big { width: 100%; height: 12px; margin-top: 16px; }
+.cal { display: grid; gap: 10px; } .cal-s { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 14px; }
+.cal-s span { grid-column: 1; font-size: 14px; color: var(--ink-2); } .cal-s button { grid-row: 1 / span 2; grid-column: 2; } .cal-s.done { border-color: var(--pass); background: #F5FCF9; }
+.howto h3 { margin: 16px 0 6px; font-size: 16px; } .howto ol, .howto ul { padding-left: 20px; display: grid; gap: 6px; font-size: 14.5px; margin: 0 0 6px; }
+.lv-line .how { font-size: 10.5px; background: #EEF1F6; border-radius: 4px; padding: 0 4px; }
+#modal .m-in { max-height: 86vh; overflow-y: auto; }

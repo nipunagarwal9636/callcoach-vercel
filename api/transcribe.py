@@ -18,7 +18,8 @@ class handler(BaseHTTPRequestHandler):
                 return send(self, 413, {"error": "Audio too large for a serverless upload (keep it under ~4 MB, e.g. a 2-3 minute mp3)."})
             data = self.rfile.read(n)
             name = unquote(self.headers.get("X-Filename") or "call.mp3")
-            call = transcribe(data, name)
+            sp = (self.headers.get("X-Speaker") or "").upper()
+            call = transcribe(data, name, sp if sp in ("AGENT", "CUSTOMER") else None)
             text = "\n".join(f"{t.speaker}: {t.text}" for t in call.turns)
             send(self, 200, {"transcript": text, "turns": [dict(s=t.speaker, t=t.text) for t in call.turns]})
         except Exception as e:
