@@ -52,7 +52,7 @@ function planFor(call) {
 
 function renderRecovery() {
   seedCases();
-  const all = Object.values(cases()), el = $("#v-recovery");
+  const all = Object.values(cases()).filter((c) => !window.roleSeesCall || roleSeesCall(callOf(c.id))), el = $("#v-recovery");
   const res = all.filter((c) => c.status === "resolved"), prem = (k) => res.filter((c) => c.outcome === k).reduce((a, c) => a + (callOf(c.id)?.premium || 0), 0);
   const overdue = all.filter((c) => c.status !== "resolved" && c.opened + SLA_H * 3600e3 < Date.now()).length;
   el.innerHTML = `<div class="sec-head" style="margin-top:0"><div><h2>Customer recovery</h2><p>When a fatal error happened on a call that became a sale, the customer bought on wrong information. The scorecard says: call them back and correct it. Each case comes with a script that has this plan's correct facts filled in.</p></div></div>
@@ -81,7 +81,7 @@ function caseCard(c) {
   return `<div class="case"><div class="case-h"><b>${c.id}</b>${sla(c)}</div>
     <div class="small">${esc(call.agent)}, ${plan ? esc(plan.name.replace(/ with zero depreciation/, "")) : String(call.product).toLowerCase()}${call.premium ? `, ${inr(call.premium)}` : ""}</div>
     <div class="routes" style="margin:6px 0">${c.fatal.map((p) => `<span class="chip FATAL">${p} ${esc(pname(p))}</span>`).join("")}</div>
-    ${c.status === "awaiting" ? `<button class="btn ghost small" data-act="review" data-id="${c.id}">Review the finding</button>` : ""}
+    ${c.status === "awaiting" ? (window.role && role().role === "tl" ? `<span class="chip REVIEW">Waiting for a QA reviewer</span>` : `<button class="btn ghost small" data-act="review" data-id="${c.id}">Review the finding</button>`) : ""}
     ${c.status === "tocall" ? `<select data-owner="${c.id}"><option value="">Assign to…</option>${OWNERS.map((o) => `<option ${o === c.owner ? "selected" : ""}>${o}</option>`).join("")}</select>
       <div class="cta" style="margin-top:8px"><button class="btn small" data-act="script" data-id="${c.id}">Callback script</button><button class="btn ghost small" data-act="contacted" data-id="${c.id}">Mark contacted</button></div>` : ""}
     ${c.status === "contacted" ? `<div class="cta" style="margin-top:4px"><button class="btn small" data-act="resolve" data-id="${c.id}">Record outcome</button><button class="btn ghost small" data-act="script" data-id="${c.id}">Script</button></div>` : ""}

@@ -1,5 +1,5 @@
 /* Live call monitor: listen to a real conversation, transcribe it as it happens, and flag fatal errors with the fix on screen. */
-const LIVE = { setup: "room", seq: 0, voice: null, on: false, engine: "browser", lang: "en-IN", mode: "manual", speaker: "AGENT", plan: "insurer-b-health-secure-plus",
+const LIVE = { setup: "room", seq: 0, voice: null, on: false, engine: "browser", lang: "en-IN", mode: "turns", speaker: "AGENT", lastEnd: 0, plan: "insurer-b-health-secure-plus",
   turns: [], interim: "", coach: null, log: [], seen: new Set(), rec: null, mr: null, sound: true, playing: false, t0: 0, busy: 0, ms: [] };
 const SR_ = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -24,8 +24,8 @@ function renderLive() {
         <option value="browser" ${LIVE.engine === "browser" ? "selected" : ""} ${SR_ ? "" : "disabled"}>Browser speech (Chrome or Edge)${SR_ ? "" : " – not available here"}</option>
         <option value="whisper" ${LIVE.engine === "whisper" ? "selected" : ""} ${STATUS.stt ? "" : "disabled"}>Whisper AI, 6-second chunks${STATUS.stt ? "" : " – needs STT key"}</option></select></label>
       <label>Language<select id="lv-lang"><option value="en-IN">English + Hinglish (en-IN)</option><option value="hi-IN" ${LIVE.lang === "hi-IN" ? "selected" : ""}>Hindi (hi-IN)</option></select></label>
-      <label ${LIVE.setup === "laptop" ? "hidden" : ""}>Who's speaking<select id="lv-mode"><option value="manual">I switch it (Space bar)</option><option value="voice" ${LIVE.mode === "voice" ? "selected" : ""}>Recognise by voice (calibrate once)</option><option value="auto" ${LIVE.mode === "auto" ? "selected" : ""}>From the words${STATUS.llm ? " (AI)" : " (rules)"}</option></select></label>
-      ${LIVE.setup === "room" && LIVE.mode === "voice" ? `<button class="btn ghost small" id="lv-cal">${LIVE.voice ? "Recalibrate voices" : "Calibrate voices"}</button>` : ""}
+      <label ${LIVE.setup === "laptop" ? "hidden" : ""}>Who's speaking<select id="lv-mode"><option value="turns">Automatic (recommended)</option><option value="voice" ${LIVE.mode === "voice" ? "selected" : ""}>Automatic by voice (calibrate once)</option><option value="auto" ${LIVE.mode === "auto" ? "selected" : ""}>Automatic from the words${STATUS.llm ? " (AI)" : ""}</option><option value="manual" ${LIVE.mode === "manual" ? "selected" : ""}>I switch it (Space bar)</option></select></label>
+      ${LIVE.setup === "room" && (LIVE.mode === "voice" || LIVE.mode === "turns") ? `<button class="btn ghost small" id="lv-cal">${LIVE.voice ? "Recalibrate voices" : "Calibrate voices"}</button>` : ""}
       <label>Plan being sold<select id="lv-plan">${plans.map((d) => `<option value="${d.id}" ${d.id === LIVE.plan ? "selected" : ""}>${esc(d.name.replace(/ with zero depreciation/, ""))}</option>`).join("")}</select></label>
       <label class="toggle" style="margin:0 0 6px"><input type="checkbox" id="lv-sound" ${LIVE.sound ? "checked" : ""}> <span>Alert sound</span></label>
     </div>
@@ -53,6 +53,7 @@ function renderLive() {
 function drawSpeaker() {
   const b = $("#lv-spk"); if (!b) return;
   b.innerHTML = LIVE.setup === "laptop" ? `<span class="small muted">Agent = this laptop's microphone. Customer = the call tab's audio, transcribed by Whisper every few seconds. Use headphones so the mic doesn't hear the customer.</span>`
+    : LIVE.mode === "turns" ? `<span class="nowspk ${LIVE.speaker === "AGENT" ? "ag" : "cu"}" id="lv-now">${LIVE.speaker === "AGENT" ? "Agent" : "Customer"}</span><span class="small muted">Switches by itself: each sentence is labelled from what is said and the flow of the conversation${STATUS.llm ? " (AI)" : ""}${LIVE.voice ? ", plus the calibrated voices" : ". Calibrate voices to make it sharper"}. Click any label to correct it.</span>${LIVE.voice ? `<span class="vu"><i id="lv-vu"></i></span>` : ""}`
     : LIVE.mode === "voice" ? `<span class="small muted">${LIVE.voice ? `Voices calibrated: agent ${LIVE.voice.A.db.toFixed(0)} dB, customer ${LIVE.voice.C.db.toFixed(0)} dB. Each sentence is labelled by who it sounds like. Click a label to correct it.` : "Calibrate the two voices first."}</span><span class="vu"><i id="lv-vu"></i></span>`
     : LIVE.mode === "manual"
     ? `<span class="small muted">Now speaking</span><div class="seg big-seg"><button data-sp="AGENT" class="${LIVE.speaker === "AGENT" ? "on" : ""}">Agent</button><button data-sp="CUSTOMER" class="${LIVE.speaker === "CUSTOMER" ? "on" : ""}">Customer</button></div><span class="small muted">Press <kbd>Space</kbd> to switch</span>`
@@ -105,15 +106,18 @@ async function addSegment(text, speaker, ts, how) {
   LIVE.turns.splice(pos, 0, turn);
   const i = pos;
   drawTx();
-  if (!speaker && (LIVE.mode === "auto" || LIVE.mode === "voice") && STATUS.api) {
+  if (!speaker && LIVE.mode !== "manual") {
+    if (!STATUS.api) { turn.s = guessLocal(text, LIVE.turns.slice(0, i)); turn.how = "turn"; drawTx(); return analyse(); }
     try {
       const r = await fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, context: LIVE.turns.slice(0, i).map(({ s, t }) => ({ s, t })), use_llm: true }) });
-      const j = await r.json(); if (r.ok) { turn.s = j.speaker; turn.how = j.source === "ai" ? "AI" : "words"; }
+      const j = await r.json(); if (r.ok) { turn.s = j.speaker; turn.how = j.source === "ai" ? "AI" : "auto"; }
     } catch { /* keep the current speaker */ }
+    LIVE.speaker = turn.s; const nw = $("#lv-now"); if (nw) { nw.textContent = turn.s === "AGENT" ? "Agent" : "Customer"; nw.className = "nowspk " + (turn.s === "AGENT" ? "ag" : "cu"); }
     drawTx();
   }
   analyse();
 }
+function guessLocal(text, ctx) { const prev = ctx[ctx.length - 1]?.s; return prev === "AGENT" ? "CUSTOMER" : "AGENT"; }
 
 async function analyse() {
   if (!STATUS.api || !LIVE.turns.length) return drawDash();
@@ -234,11 +238,16 @@ async function startListening() {
   if (!LIVE.t0 || !LIVE.turns.length) LIVE.t0 = Date.now();
   if (LIVE.setup === "laptop") return startLaptopCall();
   if (LIVE.mode === "voice") { if (!LIVE.voice) return calibrate(); if (!(await meterStart())) return; }
+  if (LIVE.mode === "turns" && LIVE.voice && !(await meterStart())) return;
+  LIVE.lastEnd = 0;
   if (LIVE.engine === "browser") {
     if (!SR_) return toast("Use Chrome or Edge for live listening, or pick Whisper");
     LIVE.rec = speechRec((text, from, to) => {
-      const v = LIVE.mode === "voice" ? whoByVoice(from, to) : null;
-      if (v && v.sure) addSegment(text, v.s, from, "voice"); else addSegment(text, null, from);
+      const gap = LIVE.lastEnd ? from - LIVE.lastEnd : 99999; LIVE.lastEnd = to;
+      const v = (LIVE.mode === "voice" || LIVE.mode === "turns") ? whoByVoice(from, to) : null;
+      const prev = LIVE.turns[LIVE.turns.length - 1];
+      if (v && v.sure) addSegment(text, v.s, from, "voice");
+      else addSegment(text, null, from);
     });
     try { LIVE.rec.start(); } catch (e) { return toast(e.message); }
   } else {

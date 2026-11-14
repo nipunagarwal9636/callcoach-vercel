@@ -133,16 +133,20 @@ function welcome() {
     <div class="mpad"><h2>Every call heard. Every miss fixed.</h2><p class="muted" style="margin:8px 0 18px">CallCoach scores every PolicyNest sales call, checks it against the policy, sends real mistakes to a person, and turns them into callbacks and coaching. Where do you want to start?</p>
     <div class="wl-opts">
       <button data-w="tour"><b>Take the 3-minute guided demo</b><span>Autopilot walks through the whole loop. Best for judges.</span></button>
-      <button data-w="review"><b>I'm a QA auditor</b><span>Go to the review queue</span></button>
-      <button data-w="flags"><b>I'm a team lead</b><span>See today's flags and coaching</span></button>
-      <button data-w="explore"><b>Look around on my own</b><span>Start at the overview</span></button>
+      <button data-w="tl"><b>I'm a team lead</b><span>My team's flags, callbacks and coaching</span></button>
+      <button data-w="qa"><b>I'm a QA auditor</b><span>Review AI findings, keep the trail clean</span></button>
+      <button data-w="agent"><b>I'm an agent</b><span>My calls, my coaching, practice</span></button>
+      <button data-w="explore"><b>Show me everything</b><span>Full view of every page</span></button>
     </div>
     <label class="fld" style="margin-top:16px">Your name, for the audit trail (optional)<input id="wl-name" value="${esc(me().name)}" placeholder="e.g. Priya" maxlength="40"></label></div></div>`, "wide");
   setTimeout(() => $("#wl-hl")?.classList.add("go"), 300);
   $$("[data-w]", m).forEach((b) => b.onclick = () => {
     const n = $("#wl-name").value.trim(); if (n) Store.set("me", { name: n, role: "QA auditor" });
     Store.set("welcomed", 1); closeModal();
-    const w = b.dataset.w; if (w === "tour") Tour.start(0); else if (w !== "explore") location.hash = "#" + w;
+    const w = b.dataset.w;
+    if (w === "tour") Tour.start(0);
+    else if (w === "explore") setRole({ role: "full" });
+    else { setRole({ role: w }); if (w !== "qa") setTimeout(openRoles, 200); }
   });
 }
 

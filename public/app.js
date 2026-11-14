@@ -173,7 +173,7 @@ async function transcribe(file) {
 /* ---------------- flags ---------------- */
 function renderFlags() {
   const mode = D.modes[0];
-  const rows = D.calls.map((c) => ({ c, s: c.scored[mode] })).sort((a, b) => b.s.priority - a.s.priority || a.s.score - b.s.score);
+  const rows = D.calls.filter((c) => !window.roleSeesCall || roleSeesCall(c)).map((c) => ({ c, s: c.scored[mode] })).sort((a, b) => b.s.priority - a.s.priority || a.s.score - b.s.score);
   const n = rows.length, fatal = rows.filter((r) => r.s.fatal.length).length;
   const fatalSale = rows.filter((r) => r.s.fatal.length && r.c.outcome === "SALE").length;
   const conduct = rows.filter((r) => r.s.conduct_alert).length;
@@ -316,7 +316,9 @@ const ALWAYS = new Set(["overview"]);
 const ONBOOT = [];
 const rendered = {};
 function route() {
-  const v = (location.hash || "#overview").slice(1), view = RENDER[v] ? v : "overview";
+  const v = (location.hash || "#overview").slice(1), view0 = RENDER[v] ? v : "overview";
+  const view = window.roleGuard ? roleGuard(view0) : view0;
+  if (view !== view0) { history.replaceState(null, "", "#" + view); }
   $$(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + view));
   $$("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
   if (!rendered[view] || ALWAYS.has(view)) { RENDER[view](); rendered[view] = 1; }

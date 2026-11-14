@@ -69,7 +69,7 @@ PERSONAS = {
 INFO_TRIGGERS = {"ramesh": (1, 2, 3, 4), "kamla": (1, 2, 3, 4), "vikram": (1, 2, 3)}  # answers given only to a question
 
 QWORDS = re.compile(r"\?|\b(kya|kaun|kitna|kitni|kitne|kab|kaise|kis|kisi|koi|kahan|kyun|what|who|how|which|when|where|why|any|do you|are you|is there|can you|could you|would you|have you|does|batayein|bataiye|bataye|bata dijiye)\b", I)
-AGENT_CUES = re.compile(r"policynest|insurance brokers|\bplan\b|premium|suggest|recommend|record|waiting period|co-?pay|deductible|network|cashless|sum insured|\bidv\b|\bsir\b|ma'?am|madam|aapko|aapke|aapki|main aapko|calling (from|about)|enquir|link bhej|free-?look|gst|policy wording", I)
+AGENT_CUES = re.compile(r"policynest|insurance brokers|\bplan\b|premium|suggest|recommend|record|waiting period|co-?pay|deductible|network|cashless|sum insured|\bidv\b|\bsir\b|ma'?am|madam|aapko|aapke|aapki|aapka|\bisme\b|lakh ka cover|bhej (raha|rahi|deta|deti)|is plan|ye plan|hamare|humare|main aapko|calling (from|about)|enquir|link bhej|free-?look|gst|policy wording", I)
 CUST_CUES = re.compile(r"\b(mujhe|meri|mera|mere|hum|humein|my wife|my husband|my son|my daughter|beta|beti|wife|husband|budget|kab se|hoga na|ho jayega na|samajh|achha|accha|theek hai|haan|nahi chahiye|sochna|baat karke|i want|i have|i am|i'm \d|we have|our|expire|my car)\b", I)
 
 

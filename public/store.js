@@ -65,7 +65,7 @@ function updateBadges() {
   try {
     const pend = reviewItems().filter((x) => !x.done).length;
     $("#b-review").textContent = pend || "";
-    const open = Object.values(Store.get("cases", {})).filter((c) => c.status !== "resolved").length;
+    const open = Object.values(Store.get("cases", {})).filter((c) => c.status !== "resolved" && (!window.roleSeesCall || roleSeesCall(callOf(c.id)))).length;
     $("#b-recovery").textContent = open || "";
   } catch { /* data not loaded yet */ }
 }
