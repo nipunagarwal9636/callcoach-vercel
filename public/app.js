@@ -321,6 +321,7 @@ function route() {
   $$("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
   if (!rendered[view] || ALWAYS.has(view)) { RENDER[view](); rendered[view] = 1; }
   scrollTo({ top: 0 });
+  window.onRoute?.(view);
 }
 
 async function boot() {
@@ -360,4 +361,4 @@ async function boot() {
   addEventListener("hashchange", route);
   route();
 }
-boot().catch((e) => { $("main").innerHTML = `<div class="empty">Couldn't load the app data: ${esc(e.message)}</div>`; });
+boot().finally(() => document.body.classList.add("ready")).catch((e) => { $("main").innerHTML = `<div class="empty">Couldn't load the app data: ${esc(e.message)}</div>`; });

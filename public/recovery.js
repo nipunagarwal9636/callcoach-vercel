@@ -137,7 +137,7 @@ function showScript(id) {
       <li><b>Give the choice.</b> “If you're still within the free-look period${f.free_look_days ? ` of ${f.free_look_days} days` : ""} from receiving the documents, you can keep the policy knowing these terms, or cancel it for a refund. There's no pressure either way. What would you like to do?”</li>
       <li><b>Close.</b> “I'll email you this summary with the policy wording. If you have questions later, reply to that email or call us.”</li>
     </ol>
-    ${c.fatal.includes("P8") || callOf(id).turns.some((t) => /otp/i.test(t.t)) ? `<div class="alert"><b>OTP on this call.</b> If the customer shared an OTP, tell them to contact their bank now, and log a conduct case.</div>` : ""}
+    ${callOf(id).scored?.[D.modes[0]]?.conduct_alert ? `<div class="alert"><b>OTP on this call.</b> If the customer shared an OTP, tell them to contact their bank now, and log a conduct case.</div>` : ""}
     <p class="small muted">Wrong on the original call (evidence):</p>${c.fatal.map((p) => { const r = callOf(id).scored?.[D.modes[0]]?.results?.[p]; return r?.quote ? `<div class="said"><b>${p}</b> turn ${esc((r.turns || []).join(", "))}: <mark>${esc(r.quote)}</mark></div>` : ""; }).join("")}`, true);
 }
 

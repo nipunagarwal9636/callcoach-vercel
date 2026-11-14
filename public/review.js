@@ -88,7 +88,7 @@ function drawDetail(x) {
       </div>`;
     }).join("")}
     ${other.length ? `<p class="small muted" style="margin-top:12px">Also found, no sign-off needed: ${other.map((p) => `${p} ${esc(pname(p))}`).join("; ")}.</p>` : ""}
-    <div class="rv-sign">${dec.signed ? `<span class="chip MET">Signed off by ${esc(dec.signed.by)}, ${when(dec.signed.ts)}. Final score ${dec.signed.final}</span>`
+    <div class="rv-sign">${dec.signed ? `<span class="chip MET">Signed off by ${esc(dec.signed.by)}, ${when(dec.signed.ts)}. Final score ${dec.signed.final}</span><button class="btn small" id="rv-next">Next waiting call</button>`
       : `<span class="small muted">Final score if signed now: <b>${fs.score}</b>${fs.fatal.length ? ` (fatal ${fs.fatal.join(", ")} confirmed)` : ""}</span><button class="btn" id="rv-sign" ${decided ? "" : "disabled"}>Sign off call</button>`}</div>
   </div>
   <div class="panel" style="margin-top:16px"><h3 style="margin-bottom:10px">Transcript</h3>${transcriptHTML(x.call.turns, x.s)}</div>`;
@@ -110,6 +110,7 @@ function drawDetail(x) {
     const all = Store.get("decisions", {}); delete all[x.id].items[b.dataset.undo]; Store.set("decisions", all);
     await Trail.add("Decision reopened", `${x.id} ${b.dataset.undo}`, "Reviewer changed their mind before sign-off"); renderReview();
   });
+  $("#rv-next", box)?.addEventListener("click", () => { const n = reviewItems().find((y) => !y.done); if (!n) return toast("Queue is clear"); rvSel = n.id; drawQueue(reviewItems()); });
   $("#rv-sign", box)?.addEventListener("click", async () => {
     const m = needMe(); if (!m) return;
     const all = Store.get("decisions", {}), d = all[x.id] || { items: {} }, f = finalScore(x.s, d);
@@ -117,7 +118,7 @@ function drawDetail(x) {
     await Trail.add("Call signed off", x.id, `final score ${f.score}; confirmed ${Object.entries(d.items).filter(([, v]) => v.d === "confirm").map(([k]) => k).join(", ") || "none"}; overturned ${Object.entries(d.items).filter(([, v]) => v.d === "overturn").map(([k]) => k).join(", ") || "none"}`);
     if (f.fatal.length && x.call.outcome === "SALE") { await openCase(x, f.fatal, "Reviewer confirmed a fatal error on a sale"); toast("Signed off. A customer recovery case was opened."); }
     else { if (!f.fatal.length) await closeIfOverturned(x); toast("Signed off"); }
-    const next = reviewItems().find((y) => !y.done); rvSel = next?.id; renderReview();
+    rvSel = x.id; renderReview();
   });
 }
 
