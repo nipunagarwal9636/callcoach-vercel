@@ -59,6 +59,11 @@ for tid in sorted(calls):
         labels={p: labels[tid][p]["result"] for p in ORDER},
         scored={mode: scored[mode][tid] for mode in modes},
     ))
+_cs = pd.read_excel(ROOT / "data/calls_and_audits.xlsx", "calls").drop_duplicates("call_id").set_index("call_id")
+for r in rows:
+    if r["call_id"] in _cs.index:
+        r["premium"] = int(_cs.loc[r["call_id"], "premium_inr"])
+        r["call_start"] = str(_cs.loc[r["call_id"], "call_start"])[:16]
 dump("calls.json", dict(modes=modes, calls=rows))
 
 # coaching: per agent and per team, every flagged parameter
@@ -123,3 +128,74 @@ dump("evaluation.json", ev)
 
 # demo inputs
 dump("stress.json", json.loads((ROOT / "data/stress_set.json").read_text()))
+
+# ---------------- agent performance ----------------
+xl = pd.read_excel(ROOT / "data/calls_and_audits.xlsx", None)
+aud = xl["qa_audits"].copy()
+cl = xl["calls"].drop_duplicates()
+cmp_ = xl["complaints"]
+ag = xl["agents"]
+PCOLS = {"P1": ("P1_opening", 5), "P2": ("P2_recording", None), "P3": ("P3_need", 15), "P4": ("P4_accurate", 15), "P5": ("P5_mandatory", None),
+         "P6": ("P6_no", None), "P7": ("P7_no", 15), "P8": ("P8_premium", 15), "P9": ("P9_listening", 20), "P10": ("P10_closing", 15)}
+
+
+def fails(r):
+    out = []
+    for p, (c, pts) in PCOLS.items():
+        v = r[c]
+        if pts is None:
+            if str(v).upper() == "FAIL":
+                out.append(p)
+        elif pd.notna(v) and float(v) < pts:
+            out.append(p)
+    return out
+
+
+aud["fails"] = aud.apply(fails, axis=1)
+aud["audit_date"] = pd.to_datetime(aud["audit_date"])
+aud["feedback_given_on"] = pd.to_datetime(aud["feedback_given_on"])
+floor_rate = {p: float(aud["fails"].apply(lambda f: p in f).mean()) for p in PCOLS}
+sales = cl[cl.outcome == "SALE"]
+lab_by_agent = {}
+for r in rows:
+    lab_by_agent.setdefault(r["agent_id"], []).append(dict(id=r["id"], score=r["scored"][main]["score"], fatal=r["scored"][main]["fatal"],
+                                                          flags=r["scored"][main]["flags"], true_score=r["true_score"]))
+agents_out = []
+for a in ag.to_dict("records"):
+    aid = a["agent_id"]
+    A = aud[aud.agent_id == aid].sort_values("audit_date")
+    S = sales[sales.agent_id == aid]
+    audits = []
+    for r in A.to_dict("records"):
+        lag = (r["feedback_given_on"] - r["audit_date"]).days if pd.notna(r["feedback_given_on"]) else None
+        audits.append(dict(id=r["audit_id"], call=r["call_id"], date=r["audit_date"].strftime("%Y-%m-%d"), score=int(r["total_score"]),
+                           fatal=bool(r["fatal_error"]), fails=r["fails"], comment=str(r["auditor_comment"]) if pd.notna(r["auditor_comment"]) else "",
+                           feedback_days=lag, coached=bool(r["coaching_session_held"]), auditor=r["auditor_id"]))
+    mistakes = {}
+    for r in audits:
+        for c in [x.strip() for x in r["comment"].split(";") if x.strip() and x.strip().lower() not in ("nan", "")]:
+            mistakes[c] = mistakes.get(c, 0) + 1
+    rate = {p: (sum(p in r["fails"] for r in audits) / len(audits)) if audits else None for p in PCOLS}
+    first_coach = next((i for i, r in enumerate(audits) if r["coached"]), None)
+    ba = None
+    if first_coach is not None and 0 < first_coach + 1 < len(audits):
+        before = [r["score"] for r in audits[: first_coach + 1]]
+        after = [r["score"] for r in audits[first_coach + 1:]]
+        ba = dict(before=sum(before) / len(before), after=sum(after) / len(after), n_before=len(before), n_after=len(after),
+                  coached_on=audits[first_coach]["date"])
+    C = cmp_[cmp_.agent_id == aid]
+    agents_out.append(dict(
+        id=aid, name=a["agent_name"], team_lead_id=a["team_lead_id"], team_lead=a["team_lead_name"], tenure=int(a["tenure_months"]),
+        prior=a["prior_experience"], languages=a["languages"], certified=bool(a["irdai_certified"]), target=int(a["monthly_premium_target_inr"]),
+        calls=int(a["sample_calls"]), sales=int(a["sample_sales"]), premium=int(a["sample_premium_inr"]),
+        free_look=int(S["free_look_cancelled"].sum()), complaints=int(len(C)),
+        complaint_cats={k: int(v) for k, v in C["category"].value_counts().items()},
+        avg_qa=(None if pd.isna(a["avg_qa_score"]) else float(a["avg_qa_score"])), audits=audits, fail_rate=rate,
+        mistakes=sorted(mistakes.items(), key=lambda x: -x[1])[:5], before_after=ba, labelled=lab_by_agent.get(aid, []),
+        coach_modules=list(coach["agents"].get(aid, {}).get("modules", {}).keys()),
+    ))
+dump("agents.json", dict(floor_rate=floor_rate, floor_avg=float(aud["total_score"].mean()), n_audits=int(len(aud)), agents=agents_out))
+
+# ---------------- policy library seed ----------------
+from qa.policy import seed_docs, facts, chunks  # noqa: E402
+dump("policies.json", [dict(id=d["id"], name=d["name"], text=d["text"], source="sample", facts=facts(d), clauses=len(chunks(d))) for d in seed_docs()])

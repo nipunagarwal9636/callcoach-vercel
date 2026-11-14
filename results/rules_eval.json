@@ -531,7 +531,7 @@
   }
  },
  "review_rate": 0.0,
- "seconds_per_call": 0.0034733923998746005,
+ "seconds_per_call": 0.0031382409009066497,
  "avg_tokens": {
   "prompt": 0.0,
   "completion": 0.0

@@ -152,6 +152,7 @@ async function scoreDemo() {
     const extra = masked ? `<details class="mask"><summary>What the AI judge sees (masked)</summary><pre>${esc(masked)}</pre></details>` : "";
     out.innerHTML = resultBlock(s, turns, unchanged ? lab.labels : null, extra);
     animateRings(out);
+    if (window.afterScore) window.afterScore(out, s, turns, text, lab && unchanged ? lab : null);
     if (innerWidth < 1020) out.scrollIntoView({ behavior: "smooth" });
   } catch (e) {
     out.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
@@ -311,19 +312,21 @@ function renderResults() {
 
 /* ---------------- router + boot ---------------- */
 const RENDER = { overview: renderOverview, demo: () => {}, flags: renderFlags, coaching: () => {}, patterns: renderPatterns, results: renderResults };
+const ALWAYS = new Set(["overview"]);
+const ONBOOT = [];
 const rendered = {};
 function route() {
   const v = (location.hash || "#overview").slice(1), view = RENDER[v] ? v : "overview";
   $$(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + view));
   $$("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
-  if (!rendered[view] || view === "overview") { RENDER[view](); rendered[view] = 1; }
+  if (!rendered[view] || ALWAYS.has(view)) { RENDER[view](); rendered[view] = 1; }
   scrollTo({ top: 0 });
 }
 
 async function boot() {
-  const [scorecard, calls, coach, patterns, ev, stress] = await Promise.all(
-    ["scorecard", "calls", "coaching", "patterns", "evaluation", "stress"].map((n) => getJSON(`data/${n}.json`)));
-  Object.assign(D, { scorecard, calls: calls.calls, modes: calls.modes, coach, patterns, eval: ev, stress, order: scorecard.map((p) => p.id) });
+  const [scorecard, calls, coach, patterns, ev, stress, agents, policies] = await Promise.all(
+    ["scorecard", "calls", "coaching", "patterns", "evaluation", "stress", "agents", "policies"].map((n) => getJSON(`data/${n}.json`)));
+  Object.assign(D, { scorecard, calls: calls.calls, modes: calls.modes, coach, patterns, eval: ev, stress, agents, policies, order: scorecard.map((p) => p.id) });
 
   try {
     const r = await fetch("/api/status"); if (!r.ok) throw 0;
@@ -353,6 +356,7 @@ async function boot() {
   fillCoachWho();
   $("#res-seg").addEventListener("click", (e) => { const m = e.target.dataset?.m; if (m) { resMode = m; renderResults(); } });
   $("#replay-btn").addEventListener("click", heroReplay);
+  for (const f of ONBOOT) { try { await f(); } catch (e) { console.error(e); } }
   addEventListener("hashchange", route);
   route();
 }

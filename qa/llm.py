@@ -135,6 +135,12 @@ How to judge:
 - P10: judged on the final close. After a sale it must mention documents and the free-look period.
 - Personal details are masked as [NAME], [PHONE], [HEALTH CONDITION]; treat [HEALTH CONDITION] as a real existing illness.
 - Be conservative on fatal parameters (P2, P5, P6): if you are unsure, still give your best answer but set confidence below 0.6 so a human reviews it.
+- Judge meaning, not keywords. Agents paraphrase, so catch the same failure in any words:
+  * P6: any assurance that a claim will be paid or approved ("your claim will definitely be settled", "no claim is ever rejected", "I'll make sure it passes"), or money back without a claim, is a false promise.
+  * P8: asking for any code or number the customer received by SMS or from a card or bank ("the 6-digit code you just got", "read me the number on the back") is an OTP/PIN/card request and a conduct alert.
+  * P7: pressure counts in any words: deadlines, scarcity, guilt, fear of missing out, or pushing after the customer asked for time.
+  * P9: talking over or cutting off the customer counts even without an [overlap] tag, e.g. the agent answers before the customer finishes, or the customer says "let me finish" / "aap meri baat sun hi nahi rahe".
+- Do not over-flag: a reassurance that is true for what the customer asked (e.g. a benefit that really is covered) is MET.
 - Rule-layer hints are given to you. They can be wrong in both directions: verify them in context.
 
 Return ONLY JSON:

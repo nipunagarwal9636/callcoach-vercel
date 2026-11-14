@@ -1,43 +1,54 @@
-# CallCoach QA (PS-04): web version for Vercel
+# CallCoach QA (PS-04): every call heard, every miss fixed
 
-Every PolicyNest sales call scored against the 10-parameter scorecard, with the evidence turn marked, risk routed, floor patterns
-found, and coaching built from the agent's own calls. All data is synthetic.
+Auto-QA and coaching for PolicyNest's sales floor (Masters' Union Applied AI Challenge, PS-04). All data is synthetic.
 
-- `public/`: the site (HTML, CSS, JS). Precomputed results live in `public/data/*.json`.
-- `api/`: Python serverless functions. `score` (rules + optional AI judge), `status`, `coach` (AI-personalised module), `transcribe` (audio).
-- `qa/`: the scoring engine, shared with the Streamlit version.
+The product is one loop: **Detect → Decide → Fix → Prevent → Prove**.
 
-## Run it on your laptop
+| Stage | Page | What it does |
+|---|---|---|
+| Detect | Score a call | Transcript or audio → 10-parameter scorecard with turn and quote per failure; rules + optional AI judge |
+| Detect | Policy check | Checks what the agent said against the plan's policy wording, clause by clause, with citations. Upload any policy PDF |
+| Decide | Review queue | QA auditor confirms or overturns each fatal/unsure finding; every action on a SHA-256 hash-chained audit trail (verify, tamper test, CSV export) |
+| Decide | Today's flags | Team lead's ranked queue |
+| Fix | Customer recovery | Fatal error on a sale → callback case, 48-hour timer, script filled with the plan's correct facts, outcome tracking |
+| Fix | Coaching / Agents | Modules from the agent's own calls; agent dashboard from 359 audits: trend, mistakes, before/after coaching |
+| Prevent | Live Sales Buddy | Role-play with a simulated customer (scripted, or AI with a key); a live coach flags risky lines and suggests the next best line; voice input in Chrome |
+| Prove | Accuracy | Run the deployed engine on the stress set or all 110 labelled calls live, with the AI judge on; metrics, latency, export |
+| Prove | Floor patterns, P&L and ROI | Root causes; monthly P&L with the brief's numbers and editable, labelled assumptions; break-even and payback |
+
+## Run locally
 
 ```bash
 pip install openai pandas openpyxl
-python dev_server.py            # open http://localhost:3000
+python dev_server.py            # http://localhost:3000
 ```
 
-## Deploy on Vercel (about 5 minutes)
+## Deploy on Vercel
 
-1. Push this folder to a new GitHub repository (it must be the repo root, with `vercel.json` at the top).
-2. On vercel.com: **Add New → Project**, import the repo. Framework preset: **Other**. Leave build settings empty. Deploy.
-3. To switch on the AI judge: **Project → Settings → Environment Variables**, add
-   - `LLM_PROVIDER` = `gemini` (or `groq`, `openai`, `openrouter`)
-   - `LLM_API_KEY` = your key (free Gemini key: aistudio.google.com/apikey)
-   - optional for audio upload: `STT_PROVIDER` = `groq`, `STT_API_KEY` = your Groq key
+1. Push this folder to GitHub (repo root = this folder). Vercel: Add New → Project → import → Framework preset **Other** → Deploy.
+2. Settings → Environment Variables, then Redeploy:
+   - `LLM_PROVIDER` = `groq` (or `gemini`), `LLM_API_KEY` = your key
+   - optional `LLM_MODEL` (default for Groq: `openai/gpt-oss-120b`)
+   - optional audio: `STT_PROVIDER` = `groq`, `STT_API_KEY` = same Groq key
+3. Check `https://<your-app>.vercel.app/api/status` shows `"check": "ok"`.
 
-   Then **Deployments → Redeploy**. The dot in the top bar turns green and says which model is on.
+## Where state lives
 
-Never commit keys. They live only in Vercel's environment variables.
+Review decisions, the audit trail, recovery cases, coaching logs, uploaded policies and benchmark runs are stored in the
+browser (localStorage) for this MVP, so each viewer has their own copy. Production would put the same records in a database
+(e.g. Postgres) with sign-in; the hash chain carries over unchanged.
 
-## Refresh the numbers after an AI-judge run
+## Refresh the precomputed data
 
 ```bash
-pip install pandas openpyxl openai
-LLM_PROVIDER=gemini LLM_API_KEY=... python scripts/evaluate.py --llm --sleep 6
-python scripts/export_web.py    # rewrites public/data/*.json; Results page gains a "Rules and AI judge" tab
+python scripts/evaluate.py            # rule-layer results
+python scripts/export_web.py          # rewrites public/data/*.json
 ```
 
 ## Honest limits
 
-- The labelled transcripts are template-generated, so the rule layer scores them almost perfectly. The 12 hand-written stress calls
-  reword violations; rules alone get 18 of 23 checks, which is why the AI judge exists.
-- Audio uploads are limited to about 4 MB on Vercel's free plan.
-- No pure-Hindi labelled calls, so Hindi accuracy is untested.
+- The labelled transcripts are template-generated and the rules were tuned on them, so 100% there does not generalise.
+  The 12-call stress set rewords violations: rules alone get 18/23. The Accuracy page measures the AI judge live.
+- Policy wordings in `qa/policies/` are synthetic samples written from the facts agents state in the labelled calls.
+- Policy fact extraction is regex-based for plainly worded limits; other statements need the AI check.
+- ROI assumptions (auditor cost, reduction rates, platform cost) are ours and editable on the page.
