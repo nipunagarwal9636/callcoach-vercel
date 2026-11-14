@@ -20,6 +20,6 @@ class handler(BaseHTTPRequestHandler):
             name = unquote(self.headers.get("X-Filename") or "call.mp3")
             call = transcribe(data, name)
             text = "\n".join(f"{t.speaker}: {t.text}" for t in call.turns)
-            send(self, 200, {"transcript": text, "turns": len(call.turns)})
+            send(self, 200, {"transcript": text, "turns": [dict(s=t.speaker, t=t.text) for t in call.turns]})
         except Exception as e:
             send(self, 500, {"error": str(e)[:300]})

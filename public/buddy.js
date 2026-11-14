@@ -1,5 +1,5 @@
 /* Live AI Sales Buddy: the agent rehearses with a simulated customer; a live coach flags risky lines as they're said. */
-const BUDDY = { persona: "ramesh", turns: [], coach: null, busy: false, ai: false, voice: false, rec: null, ms: [] };
+const BUDDY = { persona: "ramesh", turns: [], coach: null, busy: false, ai: null, voice: false, rec: null, ms: [] };
 const PERSONAS_UI = {
   ramesh: { name: "Ramesh Gupta", tag: "58, has BP, Hinglish. Wants to ask his wife before buying.", plan: "Insurer B · Health Secure Plus" },
   kamla: { name: "Kamla Devi", tag: "66, diabetic, gets confused by numbers. Her daughter decides.", plan: "Insurer A · Senior Care" },
@@ -7,6 +7,7 @@ const PERSONAS_UI = {
 };
 
 function renderBuddy() {
+  if (BUDDY.ai === null) BUDDY.ai = !!STATUS.llm;
   const el = $("#v-buddy"), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   el.innerHTML = `<div class="sec-head" style="margin-top:0"><div><h2>Live Sales Buddy</h2><p>Practise a call before it's real. You are the agent; the customer is simulated. The coach on the right watches every line and stops a mistake while it can still be fixed.</p></div></div>
   <div class="personas">${Object.entries(PERSONAS_UI).map(([k, p]) => `<button class="persona ${k === BUDDY.persona ? "on" : ""}" data-p="${k}"><b>${p.name}</b><span class="small">${p.tag}</span><span class="small muted">Plan to sell: ${p.plan}</span></button>`).join("")}</div>
@@ -81,7 +82,7 @@ function sendLine() {
 
 function toggleMic(SR) {
   if (BUDDY.rec) { BUDDY.rec.stop(); return; }
-  const r = new SR(); r.lang = "en-IN"; r.interimResults = true; r.continuous = false;
+  const r = new SR(); r.lang = "en-IN"; toast("Listening. Speak one line; it sends when you pause."); r.interimResults = true; r.continuous = false;
   const b = $("#bd-mic"); b.classList.add("live");
   r.onresult = (e) => { $("#bd-in").value = [...e.results].map((x) => x[0].transcript).join(" "); };
   r.onend = () => { b.classList.remove("live"); BUDDY.rec = null; if ($("#bd-in").value.trim()) sendLine(); };

@@ -197,7 +197,7 @@ def check_statement(turn_no, text, f, doc, prev_customer=""):
     # promises
     if re.search(r"(premium|paisa|money|paise)\s*(back|wapas|return)|get (your|the) (premium|money) back|wapas mil", low) and f.get("no_return_of_premium"):
         add("Return of premium", "CONTRADICTED", "No return of premium or claim-free payout", "P6", ["return of premium"])
-    if re.search(r"100\s?%\s*(approved|pass|claim|sure)|guarantee|pakka (pass|approve)|definitely (be )?(approved|settled|paid)|never (be )?rejected", low) \
+    if re.search(r"(100|hundred)\s?(%|percent)\s*(approved|pass|claim|sure|settle)|guarantee|pakka (pass|approve)|definitely (be )?(approved|settled|paid)|never (be )?rejected", low) \
             and not re.search(r"(no|can'?t|cannot|not|nahi)\s+(a\s+)?guarantee|guarantee nahi", low) and f.get("claims_not_guaranteed"):
         add("Claim approval", "CONTRADICTED", "Claims are decided by the insurer; no one can guarantee approval", "P6", ["claims", "guarantee"])
     return out

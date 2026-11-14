@@ -68,6 +68,47 @@ PERSONAS = {
 
 INFO_TRIGGERS = {"ramesh": (1, 2, 3, 4), "kamla": (1, 2, 3, 4), "vikram": (1, 2, 3)}  # answers given only to a question
 
+QWORDS = re.compile(r"\?|\b(kya|kaun|kitna|kitni|kitne|kab|kaise|kis|kisi|koi|kahan|kyun|what|who|how|which|when|where|why|any|do you|are you|is there|can you|could you|would you|have you|does|batayein|bataiye|bataye|bata dijiye)\b", I)
+AGENT_CUES = re.compile(r"policynest|insurance brokers|\bplan\b|premium|suggest|recommend|record|waiting period|co-?pay|deductible|network|cashless|sum insured|\bidv\b|\bsir\b|ma'?am|madam|aapko|aapke|aapki|main aapko|calling (from|about)|enquir|link bhej|free-?look|gst|policy wording", I)
+CUST_CUES = re.compile(r"\b(mujhe|meri|mera|mere|hum|humein|my wife|my husband|my son|my daughter|beta|beti|wife|husband|budget|kab se|hoga na|ho jayega na|samajh|achha|accha|theek hai|haan|nahi chahiye|sochna|baat karke|i want|i have|i am|i'm \d|we have|our|expire|my car)\b", I)
+
+
+SPOKEN_PROMISE = re.compile(r"(100|hundred)\s?(%|percent)|definitely (be )?(approved|settled|paid|pass)|\bguarantee|pakka (pass|approve|milega|ho jayega)|claim (kabhi )?reject nahi|never (be )?rejected|premium wapas|paisa wapas|money back", I)
+
+
+def is_question(text):
+    return bool(QWORDS.search(text or ""))
+
+
+def guess_speaker(text, context):
+    """Rule-based guess of who said a live segment: AGENT or CUSTOMER (fallback when no LLM)."""
+    a, c = len(AGENT_CUES.findall(text)), len(CUST_CUES.findall(text))
+    if a > c:
+        return "AGENT"
+    if c > a:
+        return "CUSTOMER"
+    prev = context[-1]["s"] if context else "CUSTOMER"
+    return "CUSTOMER" if prev == "AGENT" else "AGENT"
+
+
+LABEL_SYSTEM = """You label who is speaking on a live Indian insurance sales call. The AGENT works for PolicyNest Insurance Brokers and sells a policy;
+the CUSTOMER answers questions and asks about cover. Given the recent conversation and a new segment, say who spoke the new segment.
+Return ONLY JSON: {"speaker": "AGENT" or "CUSTOMER"}"""
+
+
+def label_segment(text, context, use_llm=True):
+    if use_llm and llm.available():
+        try:
+            convo = "\n".join(f"{t['s']}: {t['t']}" for t in context[-8:])
+            out = llm.chat_json(LABEL_SYSTEM, f"Recent conversation:\n{convo or '(start of call)'}\n\nNew segment: {text}", max_tokens=300)
+            sp = str(out.get("speaker", "")).upper()
+            if sp.startswith(("A", "C")):
+                return ("AGENT" if sp.startswith("A") else "CUSTOMER"), "ai"
+        except Exception:
+            pass
+    return guess_speaker(text, context), "rules"
+
+
 HINDI = re.compile(r"\b(hai|hoon|aap|kya|nahi|theek|ji|karna|kijiye|lijiye|bata)\b", I)
 
 
@@ -97,11 +138,12 @@ def ped_line(f, lang):
             + (f" There's also {', '.join(extra_en)}." if extra_en else "") + " It's all in the policy wording I'll send you.")
 
 
-def coach(turns, persona_id="ramesh", docs=None):
+def coach(turns, persona_id="ramesh", docs=None, plan_id=None):
     """Checklist state, next-best nudges and red alerts for the conversation so far."""
-    per = PERSONAS.get(persona_id, PERSONAS["ramesh"])
+    per = PERSONAS.get(persona_id) or dict(plan=None, lang="hi")
     docs = docs or policy.seed_docs()
-    doc = next((d for d in docs if d.get("id") == per["plan"]), None) or policy.pick_doc(turns, docs)
+    want = plan_id or per["plan"]
+    doc = (next((d for d in docs if d.get("id") == want), None) if want else None) or policy.pick_doc(turns, docs)
     f = policy.facts(doc) if doc else {}
     dom = policy.domain_of(doc) if doc else "HEALTH"
     agent = [t for t in turns if t["s"] == "AGENT"]
@@ -114,7 +156,7 @@ def coach(turns, persona_id="ramesh", docs=None):
     personal_c = next((t for t in cust if re.search(r"\d{2}|bp|sugar|diabet|bimari|wife|husband|beti|creta|car|policy|cover", t["t"], I)), None)
     rec_state = "done" if rec_t and (not personal_c or rec_t["n"] < personal_c["n"]) else ("fail" if personal_c and (not rec_t or rec_t["n"] > personal_c["n"]) else "todo")
     opening = all(p.search(A) for p in (COMPANY,)) and (NAME_INTRO.search(A) is not None)
-    need_q = sum(1 for t in agent if "?" in t["t"] and NEED_Q.search(t["t"]))
+    need_q = sum(1 for t in agent if NEED_Q.search(t["t"]))
     illness = next((t for t in cust if re.search(policy.HEALTH_WORDS, t["t"], I)), None)
     hesitated = next((t for t in cust if HESITATE.search(t["t"]) or re.search(r"wife se|baat karke|compare|beti|daughter|get back", t["t"], I)), None)
     pitched = next((t for t in agent if re.search(r"suggest|recommend", t["t"], I)), None)
@@ -134,9 +176,10 @@ def coach(turns, persona_id="ramesh", docs=None):
         prevc = " ".join(t["t"] for t in cust if t["n"] < last["n"])
         if OTP_ASK.search(lt) and not OTP_SAFE.search(lt):
             alerts.append(dict(level="fatal", title="Never ask for an OTP", said=lt, fix=_line("P8", lang), param="P8"))
-        if MISSTATE.search(lt) and illness and illness["n"] < last["n"]:
+        ill_any = next((t for t in turns if t["n"] < last["n"] and re.search(policy.HEALTH_WORDS, t["t"], I)), None)
+        if MISSTATE.search(lt) and (illness or ill_any) and (illness or ill_any)["n"] < last["n"]:
             alerts.append(dict(level="fatal", title="Don't say 'it's covered' to an existing illness", said=lt, fix=ped_line(f, lang) if f.get("ped_wait_months") else _line("P5", lang), param="P5"))
-        if PROMISE.search(lt) and not NO_PROMISE.search(lt):
+        if (PROMISE.search(lt) or SPOKEN_PROMISE.search(lt)) and not NO_PROMISE.search(lt):
             alerts.append(dict(level="fatal", title="That's a false promise", said=lt, fix=_line("P6", lang), param="P6"))
         if PRESSURE.search(lt):
             alerts.append(dict(level="major", title="That's pressure selling", said=lt, fix=_line("P7", lang), param="P7"))
@@ -219,11 +262,14 @@ def customer_reply(turns, persona_id="ramesh", use_llm=False):
         return ("Haan, kal shaam call kar lijiye. Details WhatsApp kar dijiye." if per["lang"] == "hi" else "Sure, email me and call tomorrow evening."), "script"
     if SUMMARY.search(last) or re.search(r"anything else|aur kuch", last, I):
         return ("Theek hai, thank you." if per["lang"] == "hi" else "That's all, thanks."), "script"
-    asked = "?" in last
+    asked = is_question(last)
     for i, (pat, reply) in enumerate(per["script"]):
         info = i in INFO_TRIGGERS.get(persona_id, ())
         if reply not in said and re.search(pat, last, I) and (asked or not info):
             return reply, "script"
     if not asked:
         return ("Haan ji." if per["lang"] == "hi" else "Okay."), "script"
-    return ("Achha, aur?" if per["lang"] == "hi" else "Okay, go on."), "script"
+    n = len(agent)
+    filler = (["Achha.", "Haan ji, boliye.", "Theek hai, aur kya details hain?", "Samajh gaya. Aage bataiye."] if per["lang"] == "hi"
+              else ["Okay.", "Right, go on.", "Sure. What else should I know?", "Got it."])
+    return filler[n % len(filler)], "script"

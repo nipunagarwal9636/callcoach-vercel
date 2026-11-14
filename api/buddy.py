@@ -28,7 +28,7 @@ class handler(BaseHTTPRequestHandler):
                 r, src = buddy.customer_reply(turns, pid, bool(b.get("use_llm")))
                 out.update(reply=r, reply_source=src)
                 full = turns + [dict(n=len(turns) + 1, s="CUSTOMER", t=r)]
-            out["coach"] = buddy.coach(full, pid, docs)
+            out["coach"] = buddy.coach(full, pid, docs, b.get("plan"))
             out["ms"] = round((time.time() - t0) * 1000)
             send(self, 200, out)
         except Exception as e:

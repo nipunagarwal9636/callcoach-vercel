@@ -2,6 +2,7 @@
 const ICONS = {
   overview: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   demo: '<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/>',
+  live: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   policy: '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9.5 14.5l2 2 3.5-4"/>',
   review: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   flags: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
@@ -14,7 +15,7 @@ const ICONS = {
   roi: '<path d="M7 4h11M7 9h11M7 4c5 0 7 2 7 5s-3 5-7 5l8 6"/>',
 };
 const svg = (k, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] || ""}</svg>`;
-const STAGE = { overview: ["", "Overview"], demo: ["Detect", "Score a call"], policy: ["Detect", "Policy check"], review: ["Decide", "Review queue"], flags: ["Decide", "Today's flags"],
+const STAGE = { overview: ["", "Overview"], live: ["Detect", "Live call"], demo: ["Detect", "Score a call"], policy: ["Detect", "Policy check"], review: ["Decide", "Review queue"], flags: ["Decide", "Today's flags"],
   recovery: ["Fix", "Customer recovery"], coaching: ["Fix", "Coaching"], agents: ["Fix", "Agents"], buddy: ["Prevent", "Live Sales Buddy"], results: ["Prove", "Accuracy"],
   patterns: ["Prove", "Floor patterns"], roi: ["Prove", "P&L and ROI"] };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -149,6 +150,8 @@ function welcome() {
 const TOUR = [
   { view: "overview", title: "One loop, five stages", body: "A sales call is replayed. The highlighter marks the exact sentence that broke the rules, and the stamp shows the verdict. Everything else in the app follows from this moment.",
     act: async () => { location.hash = "#overview"; await wait(200); heroReplay(); } },
+  { view: "live", title: "Detect: catch it during the call", body: "A call plays as if live. The moment the agent says “sab cover hai”, promises a claim or asks for an OTP, the dashboard turns red and shows the exact line to say instead. Press Start listening to do this with a real conversation.", focus: "#lv-dash",
+    act: async () => { location.hash = "#live"; await until(() => $("#lv-sample")); await playSample(); } },
   { view: "demo", title: "Detect: score a real call", body: "QT-001: the customer asks about his illness and the agent says “it's all covered”. The engine scores all 10 parameters and quotes the turn for every failure.", focus: "#score-btn",
     act: async () => { location.hash = "#demo"; await until(() => $("#pick")); $$("#src-seg button")[0].click(); $("#pick").value = "QT-001"; loadPick(); await scoreDemo(); } },
   { view: "demo", title: "Detect: check it against the policy", body: "The same call is checked against the plan's policy wording. Each contradiction cites the clause, e.g. pre-existing diseases wait 36 months.", focus: "#as-pol",
