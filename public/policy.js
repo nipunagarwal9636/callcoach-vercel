@@ -109,18 +109,10 @@ async function uploadDocs(files) {
 /* After "Score a call": policy check + send to review */
 window.afterScore = async (out, s, turns, text, lab) => {
   const box = document.createElement("div"); box.className = "panel"; box.style.marginTop = "20px";
-  box.innerHTML = `<div class="sec-head" style="margin:0 0 10px"><h3>Checked against the policy wording</h3>
-    <button class="btn small" id="to-review">Send to review queue</button></div><div id="as-pol"><span class="small muted">Checking clauses…</span></div>`;
+  box.innerHTML = `<div class="sharebox"></div><div class="sec-head" style="margin:14px 0 10px"><h3>Checked against the policy wording</h3></div><div id="as-pol"><span class="small muted">Checking clauses…</span></div>`;
   out.insertBefore(box, out.children[1] || null);
-  $("#to-review", box).onclick = () => {
-    const id = lab ? lab.id : "LIVE-" + new Date().toISOString().slice(5, 16).replace(/[-T:]/g, "");
-    if (!lab) {
-      const call = { id, agent: "Live call", agent_id: "-", team_lead: "-", team_lead_id: "-", product: "LIVE", language: "-", outcome: s.sale ? "SALE" : "UNKNOWN", turns, labels: null };
-      Store.set("liveQueue", [...Store.get("liveQueue", []).filter((x) => x.id !== id), { id, call, s }]);
-    }
-    Trail.add("Sent to review", id, `score ${s.score}, flags ${s.flags.join(", ") || "none"}`);
-    toast("In the review queue"); location.hash = "#review"; Store.set("reviewOpen", id);
-  };
+  if (!lab) shareUI($(".sharebox", box), s, turns, "Score a call");
+  else $(".sharebox", box).innerHTML = `<p class="small muted">This labelled call is already on ${esc(lab.agent)}'s and their team lead's dashboards.</p>`;
   if (!STATUS.api) { $("#as-pol", box).innerHTML = `<span class="small muted">Policy check needs the engine.</span>`; return; }
   try { $("#as-pol", box).innerHTML = findingsHTML(await runVerify(text, null, false), { limit: 6 }) + `<a class="small" href="#policy">Open the full policy check</a>`; }
   catch (e) { $("#as-pol", box).innerHTML = `<span class="small muted">${esc(e.message)}</span>`; }

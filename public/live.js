@@ -367,17 +367,11 @@ async function endLive() {
       ${fixes.length ? `<ol class="script">${fixes.map((f) => `<li><b>${esc(f.title)}</b> <span class="small muted">(${esc(f.param)}, ${f.at})</span><div class="small">Said: <s>${esc(f.said)}</s></div><div class="better" style="margin-top:6px">${esc(f.fix)}</div></li>`).join("")}</ol>
         <p class="small" style="margin-top:10px">${j.result.sale ? "This call ended in a sale, so the customer gets a callback with the correct facts." : "If the customer buys later, they must hear the correct terms first."} Send it to the review queue so a QA auditor confirms it.</p>`
         : `<p class="small muted">No fatal errors were flagged live.</p>`}
-      <div class="cta" style="margin-top:12px"><button class="btn" id="lv-q">Send to review queue</button></div></div>
+      <div class="lv-share" style="margin-top:12px"></div></div>
       ${pol ? `<div class="panel" style="margin-bottom:16px"><h3 style="margin-bottom:8px">Against the policy wording</h3>${findingsHTML(pol, { limit: 6 })}</div>` : ""}
       ${resultBlock(j.result, j.turns, null)}`;
     animateRings(body);
-    $("#lv-q", body).onclick = async () => {
-      const id = "LIVE-" + new Date().toISOString().slice(5, 16).replace(/[-T:]/g, "");
-      const call = { id, agent: "Live call", agent_id: "-", team_lead: "-", team_lead_id: "-", product: "LIVE", language: "-", outcome: j.result.sale ? "SALE" : "UNKNOWN", turns: j.turns, labels: null };
-      Store.set("liveQueue", [...Store.get("liveQueue", []), { id, call, s: j.result }]);
-      await Trail.add("Live call sent to review", id, `score ${j.result.score}; live alerts ${LIVE.log.map((l) => l.param).join(", ") || "none"}`);
-      closeDrawer(); Store.set("reviewOpen", id); location.hash = "#review";
-    };
+    shareUI($(".lv-share", body), j.result, j.turns, "Live call");
   } catch (e) { $("#lv-sum", body).innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 

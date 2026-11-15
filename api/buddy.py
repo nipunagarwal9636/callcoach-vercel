@@ -25,7 +25,7 @@ class handler(BaseHTTPRequestHandler):
             out = {}
             full = turns
             if b.get("reply", True):
-                r, src = buddy.customer_reply(turns, pid, bool(b.get("use_llm")))
+                r, src = buddy.customer_reply(turns, pid, bool(b.get("use_llm")), b.get("focus"))
                 out.update(reply=r, reply_source=src)
                 full = turns + [dict(n=len(turns) + 1, s="CUSTOMER", t=r)]
             out["coach"] = buddy.coach(full, pid, docs, b.get("plan"))

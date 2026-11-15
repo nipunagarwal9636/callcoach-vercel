@@ -16,6 +16,24 @@ The product is one loop: **Detect → Decide → Fix → Prevent → Prove**.
 | Prove | Accuracy | Run the deployed engine on the stress set or all 110 labelled calls live, with the AI judge on; metrics, latency, export |
 | Prove | Floor patterns, P&L and ROI | Root causes; monthly P&L with the brief's numbers and editable, labelled assumptions; break-even and payback |
 
+## Accounts (each role sees only its own data)
+
+| Sign in as | Username | Sees |
+|---|---|---|
+| Agent | their ID, e.g. `SA-001` | My dashboard (customers, calls, sales, errors per call, mistakes, coaching), lessons, practice |
+| Team lead | `TL-1` … `TL-8` | Their team's dashboard, flags, recovery, coaching, agents |
+| QA auditor | `QA-1` … `QA-5` | Review desk, review queue, audit trail, accuracy, policy check |
+| Admin | `admin` | Everything (full view) |
+
+Demo password `demo123` (admin: `admin123`). The server signs a session token and `/api/data` returns only the rows that
+account may see. Set `AUTH_SECRET`, `DEMO_PASSWORD` and `ADMIN_PASSWORD` on Vercel for anything beyond a demo.
+
+### Share state across devices (optional, free)
+
+Vercel → Storage → **Upstash for Redis** → connect to the project (it adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`), then redeploy.
+With it, newly scored calls reach the agent's and team lead's dashboards on any device, and review decisions, recovery cases,
+the audit trail and each user's memory (practice history, lessons) are shared. Without it, everything works within one browser.
+
 ## Run locally
 
 ```bash

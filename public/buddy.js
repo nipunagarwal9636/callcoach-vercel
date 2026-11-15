@@ -10,7 +10,9 @@ function renderBuddy() {
   if (BUDDY.ai === null) BUDDY.ai = !!STATUS.llm;
   const el = $("#v-buddy"), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   el.innerHTML = `<div class="sec-head" style="margin-top:0"><div><h2>Live Sales Buddy</h2><p>Practise a call before it's real. You are the agent; the customer is simulated. The coach on the right watches every line and stops a mistake while it can still be fixed.</p></div></div>
-  <div class="personas">${Object.entries(PERSONAS_UI).map(([k, p]) => `<button class="persona ${k === BUDDY.persona ? "on" : ""}" data-p="${k}"><b>${p.name}</b><span class="small">${p.tag}</span><span class="small muted">Plan to sell: ${p.plan}</span></button>`).join("")}</div>
+  ${BUDDY.focus ? `<div class="focusbar"><div><span class="small">Lesson practice</span><b>${BUDDY.focus} ${esc(LESSON_RULES[BUDDY.focus].short)}</b><span class="small">${esc(LESSON_RULES[BUDDY.focus].test)} Pass = ${BUDDY.focus} met when you end the call.</span></div>
+    <ul>${LESSON_RULES[BUDDY.focus].do.slice(0, 3).map((x) => `<li>${esc(x)}</li>`).join("")}</ul><button class="btn ghost small" id="bd-free">Free practice instead</button></div>` : ""}
+  <div class="personas" ${BUDDY.focus ? "hidden" : ""}>${Object.entries(PERSONAS_UI).map(([k, p]) => `<button class="persona ${k === BUDDY.persona ? "on" : ""}" data-p="${k}"><b>${p.name}</b><span class="small">${p.tag}</span><span class="small muted">Plan to sell: ${p.plan}</span></button>`).join("")}</div>
   <div class="grid-buddy">
     <div class="panel chatp">
       <div class="chat-top"><span class="small muted" id="bd-src">${STATUS.api ? "Customer replies from a script" : "Needs the engine (dev_server.py or Vercel)"}</span>
@@ -26,6 +28,7 @@ function renderBuddy() {
   </div>`;
   $$(".persona").forEach((b) => b.onclick = () => { BUDDY.persona = b.dataset.p; BUDDY.turns = []; renderBuddy(); });
   $("#bd-ai").onchange = (e) => { BUDDY.ai = e.target.checked; };
+  $("#bd-free")?.addEventListener("click", () => { BUDDY.focus = null; BUDDY.turns = []; renderBuddy(); });
   $("#bd-reset").onclick = () => { BUDDY.turns = []; renderBuddy(); };
   $("#bd-send").onclick = sendLine;
   $("#bd-in").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendLine(); } };
@@ -62,7 +65,7 @@ async function step(openerOnly) {
   try {
     const t0 = performance.now();
     const r = await fetch("/api/buddy", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ persona: BUDDY.persona, turns: BUDDY.turns.map(({ s, t }) => ({ s, t })), use_llm: BUDDY.ai, reply: true, docs: Store.get("uploads", []).map((d) => ({ id: d.id, name: d.name, text: d.text })) }) });
+      body: JSON.stringify({ persona: BUDDY.persona, turns: BUDDY.turns.map(({ s, t }) => ({ s, t })), use_llm: BUDDY.ai, reply: true, focus: BUDDY.focus, docs: Store.get("uploads", []).map((d) => ({ id: d.id, name: d.name, text: d.text })) }) });
     const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
     BUDDY.coach = j.coach;
     const last = [...BUDDY.turns].reverse().find((t) => t.s === "AGENT");
@@ -98,7 +101,15 @@ async function endCall() {
     const r = await fetch("/api/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript: text, use_llm: BUDDY.ai }) });
     const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
     const avg = BUDDY.ms.length ? Math.round(BUDDY.ms.reduce((a, b) => a + b, 0) / BUDDY.ms.length) : null;
-    $("#bd-score", body).innerHTML = (avg ? `<p class="small muted" style="margin-bottom:10px">Average live-coach response: ${avg} ms over ${BUDDY.ms.length} lines.</p>` : "") + resultBlock(j.result, j.turns, null);
+    let verdict = "";
+    if (BUDDY.focus) {
+      const p = BUDDY.focus, res = j.result.results[p]?.result, passed = res === "MET" && !j.result.fatal.length;
+      Memory.lesson(p, { tries: (Memory.get().lessons?.[p]?.tries || 0) + 1, passed: Memory.get().lessons?.[p]?.passed || passed, history: [...(Memory.get().lessons?.[p]?.history || []), { ts: Date.now(), score: j.result.score, passed }] });
+      verdict = `<div class="verdict-card ${passed ? "pass" : "fail"}"><b>${passed ? "Lesson passed" : "Not yet. Try again"}</b><span>${p} ${esc(pname(p))}: ${res === "MET" ? "met" : res === "NOT_APPLICABLE" ? "didn't come up; keep the call going until it does" : "not met"}${j.result.fatal.length && res === "MET" ? `, but the call still had a fatal error (${j.result.fatal.join(", ")})` : ""}.</span>
+        <div class="cta" style="margin-top:10px"><button class="btn small" onclick="closeDrawer();practise('${p}')">Practise again</button><a class="btn ghost small" href="#coaching" onclick="closeDrawer()">Back to lessons</a></div></div>`;
+    }
+    Memory.update((m) => { m.practice = [...(m.practice || []), { ts: Date.now(), focus: BUDDY.focus, persona: BUDDY.persona, score: j.result.score, fatal: j.result.fatal }].slice(-50); });
+    $("#bd-score", body).innerHTML = verdict + (avg ? `<p class="small muted" style="margin-bottom:10px">Average live-coach response: ${avg} ms over ${BUDDY.ms.length} lines.</p>` : "") + resultBlock(j.result, j.turns, null);
     animateRings(body);
     await Trail.add("Practice call scored", PERSONAS_UI[BUDDY.persona].name, `score ${j.result.score}, flags ${j.result.flags.join(", ") || "none"}`);
   } catch (e) { $("#bd-score", body).innerHTML = `<div class="empty">${esc(e.message)}</div>`; }

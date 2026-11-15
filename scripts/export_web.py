@@ -14,7 +14,7 @@ from qa.patterns import SCALE, auditors, by, findings, load, month_end, sizing, 
 from qa.scorecard import COACHING_THEME, ORDER, PARAMS  # noqa: E402
 from qa.transcript import load_labelled  # noqa: E402
 
-OUT = ROOT / "public/data"
+OUT = ROOT / "qa/webdata"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
@@ -199,3 +199,18 @@ dump("agents.json", dict(floor_rate=floor_rate, floor_avg=float(aud["total_score
 # ---------------- policy library seed ----------------
 from qa.policy import seed_docs, facts, chunks  # noqa: E402
 dump("policies.json", [dict(id=d["id"], name=d["name"], text=d["text"], source="sample", facts=facts(d), clauses=len(chunks(d))) for d in seed_docs()])
+
+# ---------------- call log (every sampled call, with its human audit if any) ----------------
+_a = aud.set_index("call_id")
+log = []
+for r in cl.sort_values("call_start").to_dict("records"):
+    row = dict(id=r["call_id"], at=str(r["call_start"])[:16], a=r["agent_id"], tl=r["team_lead_id"], p=r["product"], src=r["lead_source"],
+               lang=r["customer_language"], age=r["customer_age_band"], sec=int(r["talk_seconds"]), out=r["outcome"], prem=int(r["premium_inr"]),
+               cmp=bool(r["complaint_within_30d"]), fl=bool(r["free_look_cancelled"]))
+    if r["call_id"] in _a.index:
+        x = _a.loc[r["call_id"]]
+        x = x.iloc[0] if hasattr(x, "iloc") and getattr(x, "ndim", 1) > 1 else x
+        row["qa"] = dict(score=int(x["total_score"]), fatal=bool(x["fatal_error"]), fails=x["fails"], by=x["auditor_id"],
+                         note=str(x["auditor_comment"]) if pd.notna(x["auditor_comment"]) else "")
+    log.append(row)
+dump("calllog.json", log)

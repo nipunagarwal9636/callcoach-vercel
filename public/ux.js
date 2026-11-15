@@ -222,4 +222,4 @@ const _ro = RENDER.overview;
 RENDER.overview = () => { _ro(); countUp($("#ov-strip")); };
 
 ONBOOT.push(() => { setupShell(); });
-ONBOOT.push(() => setTimeout(welcome, 400));
+

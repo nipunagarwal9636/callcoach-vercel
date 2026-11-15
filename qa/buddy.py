@@ -231,6 +231,20 @@ def coach(turns, persona_id="ramesh", docs=None, plan_id=None):
     return dict(checklist=checklist, nudges=nudges[:3], alerts=alerts, meter=meter, plan=(policy.plan_name(doc) if doc else None))
 
 
+# Lesson practice: the customer deliberately creates the moment the lesson is about.
+FOCUS = {
+    "P1": dict(opener="Haan? Kaun bol raha hai? Kis baare mein call hai?", lines=[]),
+    "P2": dict(opener="Haan ji boliye. Main 58 ka hoon aur mujhe BP hai, health insurance chahiye.", lines=[]),
+    "P3": dict(opener="Haan ji, boliye.", lines=[(r".", "Dekhiye zyada time nahi hai, bas best plan bata dijiye.")]),
+    "P4": dict(opener="Haan ji, boliye.", lines=[(r"suggest|recommend|plan|secure", "Achha, saare hospitals mein cashless milega na? Ghar ke paas wale mein bhi?")]),
+    "P5": dict(opener="Haan ji, boliye.", lines=[(r".", "Mujhe 4 saal se BP hai, roz dawai leta hoon. Ye cover hoga na?")]),
+    "P6": dict(opener="Haan ji, boliye.", lines=[(r"suggest|recommend|plan|cover|premium", "Claim toh pakka milega na? Koi guarantee de sakte ho? Aur claim nahi kiya toh paisa wapas?")]),
+    "P7": dict(opener="Haan ji, boliye.", lines=[(r"premium|₹|plan|suggest", "Theek hai, par main abhi nahi le raha. Wife se baat karke kal batata hoon.")]),
+    "P8": dict(opener="Haan ji, boliye.", lines=[(r"premium|₹|plan|suggest", "Theek hai, lena hai. Payment kaise karun? OTP aayega toh aapko bata doon?")]),
+    "P9": dict(opener="Haan ji, boliye.", lines=[(r".", "Ek minute, pehle meri poori baat suniye. Pichli company ne claim mein bahut pareshan kiya tha, isliye main dar raha hoon...")]),
+    "P10": dict(opener="Haan ji, boliye.", lines=[(r"premium|₹|link", "Theek hai, kar deta hoon payment. Ab aage kya hoga?")]),
+}
+
 CUSTOMER_SYSTEM = """You role-play a customer on an insurance sales call so a sales agent can practise. Stay in character.
 {brief}
 Rules: reply in 1-2 short sentences, in the same language style as your persona. Answer only what the agent asked; reveal facts only when asked.
@@ -238,15 +252,22 @@ React naturally: ask about your illness/conditions when it is relevant, push bac
 Return ONLY JSON: {{"reply": "..."}}"""
 
 
-def customer_reply(turns, persona_id="ramesh", use_llm=False):
+def customer_reply(turns, persona_id="ramesh", use_llm=False, focus=None):
     per = PERSONAS.get(persona_id, PERSONAS["ramesh"])
     agent = [t for t in turns if t["s"] == "AGENT"]
+    fc = FOCUS.get(focus)
     if not agent:
-        return per["opener"], "script"
+        return (fc["opener"] if fc else per["opener"]), "script"
+    said0 = {t["t"] for t in turns if t["s"] == "CUSTOMER"}
+    if fc and len(agent) >= 2:
+        for pat, line in fc["lines"]:
+            if line not in said0 and re.search(pat, agent[-1]["t"], I):
+                return line, "script"
     if use_llm and llm.available():
         try:
             convo = "\n".join(f"{'AGENT' if t['s'] == 'AGENT' else 'YOU'}: {t['t']}" for t in turns[-16:])
-            out = llm.chat_json(CUSTOMER_SYSTEM.format(brief=per["brief"]), f"Conversation so far:\n{convo}\n\nYour next line:", temperature=0.6, max_tokens=400)
+            brief = per["brief"] + (f" For this practice, at a natural moment say something like: '{fc['lines'][0][1]}'" if fc and fc["lines"] else "")
+            out = llm.chat_json(CUSTOMER_SYSTEM.format(brief=brief), f"Conversation so far:\n{convo}\n\nYour next line:", temperature=0.6, max_tokens=400)
             r = str(out.get("reply", "")).strip()
             if r:
                 return r, "ai"

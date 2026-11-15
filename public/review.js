@@ -43,9 +43,8 @@ function renderReview() {
     <div class="kpi"><b>${ag.rate == null ? "n/a" : pct(ag.rate)}</b><span>AI findings confirmed by people (${ag.c} of ${ag.c + ag.o})</span></div>
     <div class="kpi"><b>${Trail.all().length}</b><span>entries on the audit trail</span></div>
   </div>
-  <div class="who-bar">Reviewing as <input id="rv-me" value="${esc(m.name)}" placeholder="Your name" maxlength="40"> <span class="muted small">QA auditor. Your name is stamped on every decision.</span></div>
+  <div class="who-bar">Reviewing as <b>${esc(m.name)}</b> <span class="muted small">(${esc(m.role)}). Your name is stamped on every decision.</span></div>
   <div id="rv-body"></div>`;
-  $("#rv-me").onchange = (e) => Store.set("me", { name: e.target.value.trim(), role: "QA auditor" });
   $$("#rv-seg button").forEach((b) => b.onclick = () => { rvTab = b.dataset.t; renderReview(); });
   rvTab === "queue" ? drawQueue(items) : drawTrail();
 }

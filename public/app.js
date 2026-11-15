@@ -98,6 +98,7 @@ function heroReplay() {
 }
 
 function renderOverview() {
+  if (!D.eval?.rules?.eval) { heroReplay(); return; }
   const r = D.eval.rules?.eval?.overall, h = D.eval.hybrid?.eval?.overall;
   const o = h || r, stz = (D.eval.hybrid || D.eval.rules)?.stress || [];
   const sc = (D.eval.hybrid || D.eval.rules)?.scenarios || [];
@@ -327,8 +328,12 @@ function route() {
 }
 
 async function boot() {
-  const [scorecard, calls, coach, patterns, ev, stress, agents, policies] = await Promise.all(
-    ["scorecard", "calls", "coaching", "patterns", "evaluation", "stress", "agents", "policies"].map((n) => getJSON(`data/${n}.json`)));
+  if (!Auth.ok()) { document.body.classList.add("ready"); await Auth.showLogin(); document.body.classList.remove("ready"); }
+  const _ur = Auth.user().role, _deny = { patterns: ["agent"], evaluation: ["agent", "tl"], stress: ["agent", "tl"] };
+  const get = (n, fb) => (_deny[n]?.includes(_ur) ? Promise.resolve(fb) : Auth.api(`/api/data?name=${n}`)).catch((e) => { if (fb !== undefined && e.status !== 401) return fb; throw e; });
+  const [scorecard, calls, coach, patterns, ev, stress, agents, policies] = await Promise.all([
+    get("scorecard"), get("calls"), get("coaching"), get("patterns", { sizing: {}, funnel: [{ n: 1 }], findings: [], teams: [], month_end: { rest: {}, last7: {} }, auditors: [], tenure: [], product: [] }),
+    get("evaluation", {}), get("stress", []), get("agents"), get("policies")]);
   Object.assign(D, { scorecard, calls: calls.calls, modes: calls.modes, coach, patterns, eval: ev, stress, agents, policies, order: scorecard.map((p) => p.id) });
 
   try {
