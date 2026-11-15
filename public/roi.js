@@ -8,7 +8,7 @@ const ROI_IN = [
   ["avgPremium", "Average premium per sale", 22056, 5000, 60000, 500, "₹", "data pack"],
   ["freeLook", "Sales cancelled in free-look", 5.3, 0, 15, 0.1, "%", "brief"],
   ["complaints", "Complaints per 1,000 sales", 30, 0, 100, 1, "", "brief"],
-  ["aiCost", "AI cost per scored call", 0.7, 0.1, 5, 0.05, "₹", "our estimate"],
+  ["aiCost", "AI cost per call (production models: speech-to-text plus AI judge)", 3.2, 0.5, 20, 0.1, "₹", "our estimate"],
   ["auditorRate", "Loaded cost of an auditor hour", 350, 150, 1500, 10, "₹", "assumption"],
   ["reviewMin", "Human minutes per reviewed call", 3, 1, 20, 0.5, "min", "assumption"],
   ["disputeRate", "Other calls sent to a human (unsure)", 2, 0, 20, 0.5, "%", "assumption"],
@@ -48,7 +48,7 @@ function roiSlider([k, l, d, mn, mx, st, u, src]) {
 }
 
 function renderROI() {
-  ROI = ROI || Object.fromEntries(ROI_IN.map((r) => [r[0], Store.get("roi", {})[r[0]] ?? r[2]]));
+  ROI = ROI || Object.fromEntries(ROI_IN.map((r) => [r[0], Store.get("roi3", {})[r[0]] ?? r[2]]));
   $("#v-roi").innerHTML = `<div class="sec-head" style="margin-top:0"><div><h2>P&amp;L and ROI</h2><p>What CallCoach saves PolicyNest each month, after paying for itself. Pick how optimistic to be; everything else is already filled in from the brief.</p></div></div>
   <div class="roi-pick" role="group" aria-label="How optimistic">
     ${[["low", "Cautious", "8% fewer refunds"], ["base", "Likely", "20% fewer refunds"], ["high", "Strong", "35% fewer refunds"]].map(([k, l, d]) => `<button data-s="${k}" class="${roiScen === k ? "on" : ""}"><b>${l}</b><span>${d}</span></button>`).join("")}
@@ -65,11 +65,11 @@ function renderROI() {
     <button class="btn ghost small" id="roi-reset" style="margin-top:12px">Reset to defaults</button>
   </details>
   <details class="panel roi-more" style="margin-top:12px"><summary>Full monthly P&amp;L table</summary><div class="tablewrap" style="border:0"><table class="t" id="roi-t"></table></div></details>`;
-  $$("#v-roi input[type=range]").forEach((i) => i.oninput = () => { ROI[i.dataset.k] = +i.value; Store.set("roi", ROI); drawROI(); });
-  $("#roi-reset").onclick = () => { ROI = null; roiScen = "base"; Store.del("roi"); renderROI(); };
+  $$("#v-roi input[type=range]").forEach((i) => i.oninput = () => { ROI[i.dataset.k] = +i.value; Store.set("roi3", ROI); drawROI(); });
+  $("#roi-reset").onclick = () => { ROI = null; roiScen = "base"; Store.del("roi3"); renderROI(); };
   $$(".roi-pick button").forEach((b) => b.onclick = () => {
     roiScen = b.dataset.s; $$(".roi-pick button").forEach((x) => x.classList.toggle("on", x === b));
-    Object.assign(ROI, ROI_SC[roiScen]); Store.set("roi", ROI);
+    Object.assign(ROI, ROI_SC[roiScen]); Store.set("roi3", ROI);
     for (const [k, v] of Object.entries(ROI_SC[roiScen])) { const i = $(`#v-roi input[data-k="${k}"]`); if (i) i.value = v; }
     drawROI();
   });
@@ -85,7 +85,7 @@ function drawROI() {
   const items = [["Less manual auditing", r.today.qa - r.cc.review, `${Math.round(Math.max(0, r.hoursFreed))} auditor hours a month freed for coaching`],
     ["Fewer free-look refunds", r.today.refunds - r.cc.refunds, `${v.flReduce}% fewer cancellations, because customers hear the right terms`],
     ["Fewer complaints", r.today.complaints - r.cc.complaints, `${v.cmpReduce}% fewer complaints to handle`],
-    ["Cost of running CallCoach", -(r.cc.ai + r.cc.platform), `AI on every call plus hosting and support`]];
+    ["Cost of running CallCoach", -(r.cc.ai + r.cc.platform), `AI on every call (₹${(+v.aiCost).toFixed(1)} each, production models) plus hosting and support`]];
   const max = Math.max(...items.map((i) => Math.abs(i[1])), 1);
   $("#roi-bridge").innerHTML = items.map(([l, x, d]) => `<div class="br-row"><div class="br-l"><b>${l}</b><span class="small muted">${d}</span></div>
       <div class="br-v ${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${crore(Math.abs(x))}</div><div class="br-bar"><i class="${x >= 0 ? "up" : "down"}" style="width:${Math.abs(x) / max * 100}%"></i></div></div>`).join("")
