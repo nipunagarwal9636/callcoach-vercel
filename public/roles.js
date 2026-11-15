@@ -62,7 +62,7 @@ fillCoachWho = function () {
   fillCoachParam();
 };
 const _rf = RENDER.flags;
-RENDER.flags = () => { _rf(); const R = role(); $("#f-tl").disabled = R.role === "tl"; };
+RENDER.flags = () => { const R = role(); $("#f-tl-l").hidden = R.role === "tl" || R.role === "agent"; if ($("#f-tl-l").hidden) $("#f-tl").value = ""; _rf(); };
 const _ra = RENDER.agents;
 RENDER.agents = () => { const R = role(); if (R.role === "tl") agTeam = R.team; _ra(); if (R.role === "tl") { $("#ag-team").value = R.team; $("#ag-team").disabled = true; } };
 const _rr2 = RENDER.recovery;

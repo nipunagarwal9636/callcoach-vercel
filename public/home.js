@@ -36,7 +36,7 @@ function openCallAny(id) {
   const c = D.calls.find((x) => x.id === id);
   if (c) { const b = drawer(resultBlock(c.scored[D.modes[0]], c.turns, role().role === "agent" ? null : c.labels), true); return animateRings(b); }
   const f = Feed.cache.find((x) => x.id === id);
-  if (f) { const b = drawer(`<p class="small muted" style="margin-bottom:10px">Scored ${when(f.ts)} by ${esc(f.by)} (${f.source || "live"})</p>` + resultBlock(f.s, f.turns, null), true); return animateRings(b); }
+  if (f) { const b = drawer(`<p class="small muted" style="margin-bottom:10px">Scored ${when(f.ts)} by ${esc(f.by)} (${f.source || "live"})</p>` + liveAlertsHTML(f.live_alerts) + resultBlock(f.s, f.turns, null), true); return animateRings(b); }
   const l = (D.calllog || []).find((x) => x.id === id);
   if (l) drawer(callLogDetail(l));
 }
@@ -82,7 +82,7 @@ async function homeAgent() {
       <p class="mem">${since == null ? "First time here. Start with the plan below." : `Welcome back${since ? `, last here ${since} day${since > 1 ? "s" : ""} ago` : ""}.`}
       ${lastPrac ? ` Last practice: ${lastPrac.focus ? lastPrac.focus + ", " : ""}score ${lastPrac.score}.` : ""} ${newOnes.length ? `<b>${newOnes.length} new scored call${newOnes.length > 1 ? "s" : ""} since then.</b>` : ""}</p></div></div>
     <button class="profile-chip" id="me-prof"><span>${a.id}</span><span>${a.team_lead_id}, ${esc(a.team_lead)}</span><span>${a.tenure} months${a.certified ? "" : ", not yet certified"}</span><span class="linkbtn">My profile</span></button></div>
-    ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${f.id} scored ${f.s.score}${f.s.fatal.length ? " (fatal)" : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
+    ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${f.id}, score ${f.s.score}${f.s.fatal.length ? `, fatal ${f.s.fatal.join(" ")}` : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
     <div class="tiles">${tile("customers", "agents", log.length, "Customers contacted", `${new Set(log.map((l) => l.src)).size} lead sources`)}
       ${tile("calls", "demo", log.length, "Calls done", `${fmtMin(Math.round(log.reduce((s, l) => s + l.sec, 0) / Math.max(1, log.length)))} average`)}
       ${tile("sales", "roi", sales.length, "Converted sales", `${pct(sales.length / Math.max(1, log.length))} conversion, ${crore(sales.reduce((s, l) => s + l.prem, 0))}`, "pass")}
@@ -150,7 +150,7 @@ async function homeTL() {
   const sales = log.filter((l) => l.out === "SALE");
   $("#v-home").innerHTML = `<div class="hero2"><div class="h2-l"><span class="av big tl">${esc(teamName(team).split(" ").map((w) => w[0]).join(""))}</span><div><span class="small">${greet()}, ${esc(teamName(team).split(" ")[0])}</span><h2>Your team today</h2>
       <p class="mem">${team}: ${agents.length} agents. ${newOnes.length ? `<b>${newOnes.length} new scored call${newOnes.length > 1 ? "s" : ""} from your team.</b>` : "No new scored calls since your last visit."}</p></div></div></div>
-    ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${esc(f.agent || f.agent_id)}: ${f.id}, ${f.s.score}${f.s.fatal.length ? " fatal" : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
+    ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${esc(f.agent || f.agent_id)}: ${f.id}, score ${f.s.score}${f.s.fatal.length ? `, fatal ${f.s.fatal.join(" ")}` : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
     <div class="tiles">${tile("fatal", "review", fatal.length + feed.filter((f) => f.s.fatal.length).length, "Calls with a fatal error", "scored by AI", "fatal")}
       ${tile("callbacks", "recovery", open.length, "Customer callbacks open", "fatal error on a sale", open.length ? "major" : "pass")}
       ${tile("coach", "coaching", needCoach.length, "Agents to coach", "ranked by risk", "review")}

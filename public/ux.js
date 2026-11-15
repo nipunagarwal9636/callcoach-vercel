@@ -1,5 +1,6 @@
 /* UX layer: sidebar icons, top bar, command palette, guided demo (autopilot), welcome, shortcuts, small motion. */
 const ICONS = {
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
   overview: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   demo: '<path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/>',
   live: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',

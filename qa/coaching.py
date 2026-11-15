@@ -21,8 +21,8 @@ BETTER = {
            "Cashless sirf insurer ke network hospitals (ya garages) mein milta hai; baaki jagah aap pay karke reimbursement claim karte hain. Main network list bhej deta hoon."),
     "P5": ("Thank you for telling me. Your [condition] is a pre-existing condition, so it's covered after a 3-year waiting period. There's also a 30-day initial waiting period and 2 years for specific illnesses like cataract or hernia. It's all in the policy wording I'll send you.",
            "Bataane ke liye shukriya. Aapki [condition] pehle se maujood bimari hai, iske liye 3 saal ka waiting period hai. Saath mein 30 din ka initial waiting period aur cataract ya hernia jaisi bimariyon ke liye 2 saal. Ye sab policy wording mein hai, main bhej deta hoon."),
-    "P6": ("Claims are decided by the insurer under the policy wording, so I can't promise approval. What I can do is explain exactly what is covered so there are no surprises.",
-           "Claim ka decision insurer policy wording ke hisaab se leta hai, isliye main guarantee nahi de sakta. Main aapko clearly bata sakta hoon kya cover hai, taaki baad mein koi surprise na ho."),
+    "P6": ("Claims are assessed by the insurer under the policy wording, the same way for every customer. What I can do is explain exactly what's covered and help you with the paperwork, so your claim goes smoothly.",
+           "Claim ka decision insurer policy wording ke hisaab se leta hai, sabke liye same process hai. Main aapko clearly bata deta hoon kya cover hai aur claim ke time paperwork mein help karunga, taaki sab smooth rahe."),
     "P7": ("Of course, please discuss it with your family. I'll WhatsApp you the details and the policy wording now. Shall I call you tomorrow evening at a time that suits you?",
            "Bilkul, aap family se baat kar lijiye. Main details aur policy wording abhi WhatsApp kar deta hoon. Kal shaam aapke time pe call karoon?"),
     "P8": ("The premium is Rs X including GST. I'll send a secure payment link to your registered number. Please don't share any OTP with anyone, including me.",
@@ -33,17 +33,17 @@ BETTER = {
             "Summary: [plan], premium Rs X GST ke saath. Policy ek din mein email pe aa jayegi, aur free-look period mein aap review karke cancel bhi kar sakte hain. Aur kuch?"),
 }
 
-PRACTICE = {
-    "P1": "Role-play 5 openings in a row with your team lead playing a busy customer who asks 'who is this?'.",
-    "P2": "Open 5 practice calls; the team lead checks the recording line comes before any question about the customer.",
-    "P3": "Team lead plays a customer who says 'just tell me the best plan'. Ask your 4 questions anyway and use the answers in the recommendation.",
-    "P4": "Explain 3 plans from the quote sheet; the team lead checks sum insured/IDV and the cashless wording against the quote.",
-    "P5": "Team lead plays a 52-year-old customer with diabetes who asks 'will my sugar be covered?'. Answer with all three waiting periods and any co-pay, in your own words.",
-    "P6": "Team lead asks 'Will my claim definitely be approved?' and 'Do I get money back if I don't claim?'. Answer honestly three times in a row.",
-    "P7": "Team lead says 'Let me discuss with my wife' three different ways. Each time, respect it, send details and book a follow-up. No urgency lines.",
-    "P8": "Walk through payment 3 times: premium with GST, secure link, and the 'never share OTP' line.",
-    "P9": "Team lead interrupts you mid-sentence 3 times with a confused question. Stop, let them finish, paraphrase, then answer.",
-    "P10": "Close 3 practice sales with plan, premium, documents timeline and free-look period.",
+PRACTICE = {   # every drill is run with the Live Sales Buddy, so the agent can practise alone and get scored straight away
+    "P1": "Start 3 Sales Buddy calls in a row and open each one with your name, PolicyNest and why you're calling, before anything else.",
+    "P2": "Run 3 Sales Buddy calls where the recording line is the first thing you say after your name. The coach ticks P2 the moment you say it.",
+    "P3": "In the Sales Buddy, when the customer says 'just tell me the best plan', ask your 4 questions first, then use the answers in your recommendation.",
+    "P4": "Pitch the plan to the Sales Buddy customer and explain sum insured or IDV and where cashless works (network only). Aim for a clean checklist.",
+    "P5": "Practise with Ramesh in the Sales Buddy: when he mentions his BP, explain the waiting periods and any co-pay in your own words. No red flags = pass.",
+    "P6": "Ask the Sales Buddy customer to test you on 'Will my claim be approved?' and 'What happens to my premium if I never claim?'. Answer honestly and helpfully until P6 passes.",
+    "P7": "When the Sales Buddy customer says 'let me discuss with my family', respect it, offer to send details and book a follow-up. Repeat until no pressure flag.",
+    "P8": "Take 3 Sales Buddy calls to payment: premium with GST, secure link, and the 'never share an OTP' line.",
+    "P9": "Practise with Kamla in the Sales Buddy: when she's confused, pause, paraphrase her question, then answer simply.",
+    "P10": "Close 3 Sales Buddy calls with plan, premium, document timeline and the free-look period. End the call to see the score.",
 }
 
 BANNED = [PRESSURE]  # coaching must never teach urgency or pressure
@@ -87,6 +87,9 @@ def guardrail(text):
         probs.append("contains urgency / pressure language")
     if OTP_ASK.search(text) and not OTP_SAFE.search(text):
         probs.append("tells the agent to ask for an OTP")
+    from .rules import PROMISE, _clean
+    if PROMISE.search(_clean(text)):
+        probs.append("makes a promise about claims or returns")
     if re.search(r"(?<!\d)[6-9]\d{9}(?!\d)", text):
         probs.append("contains a phone number")
     return probs
@@ -152,15 +155,30 @@ def _why(param):
     }[param]
 
 
-def _llm_personalise(module):
-    ex = "\n".join(f"Call {e['call']}: " + " | ".join(f"[{n}] {s}: {t}" for n, s, t in e["lines"]) for e in module["excerpts"])
-    sys = ("You are a sales-quality coach at an Indian insurance broker. Write short, specific, respectful coaching for a sales agent, "
-           "based only on the excerpts given. Never suggest urgency, pressure, guarantees or asking for OTPs. Do not include customer names or "
-           "health details. Match the language of the excerpts (English or Hinglish). Return JSON: "
-           "{\"feedback\": \"2-3 sentences on what went wrong, citing the excerpt\", \"better\": \"one compliant line the agent could have said\", "
-           "\"practice\": \"one role-play scenario\"}")
-    user = f"Rule: {module['rule']}\nExcerpts:\n{ex}"
-    out = llm.chat_json(sys, user, temperature=0.3, max_tokens=700)
-    module.update(feedback=out.get("feedback", ""), better=out.get("better", module["better"]),
-                  practice=out.get("practice", module["practice"]), generated_by="llm")
+def _llm_personalise(module, profile=None):
+    """Rewrite a coaching module for one agent from their own call excerpts. Output is checked by guardrail() in api/coach.py."""
+    ex = "\n".join(f"Call {e['call']}: " + " | ".join(f"[{n}] {s}: {t}" for n, s, t in e["lines"]) for e in module.get("excerpts", []))
+    p = profile or {}
+    who = ", ".join(x for x in [p.get("name") and f"agent {p['name']}", p.get("calls") and f"{p['calls']} checked calls",
+                                  p.get("fails") is not None and f"missed this rule on {p['fails']} of them",
+                                  p.get("top") and f"other weak rules: {p['top']}", p.get("tries") and f"{p['tries']} Sales Buddy practice attempts on this lesson",
+                                  p.get("passed") and "already passed the practice once"] if x)
+    sys = ("You are a warm, specific sales-quality coach at PolicyNest, an Indian insurance broker. Personalise coaching for ONE agent, "
+           "based only on their own call excerpts. Quote or paraphrase what THEY said. Rules: never suggest urgency, pressure, guarantees, "
+           "promised returns or asking for OTPs; never suggest lines that admit fault for the company, blame colleagues, criticise the insurer, "
+           "or could damage customer trust; keep every line honest and compliant with the policy wording; no customer names or health details. "
+           "Do NOT reuse the generic template line given below; write a line fitted to the agent's own situation. "
+           "Return JSON only: {\"feedback\": \"2-3 sentences: what happened on their call and why it matters, citing their words\", "
+           "\"strength\": \"one thing they did well in these excerpts, or empty\", "
+           "\"tips\": [\"3 short, concrete do-this-next-time tips\"], "
+           "\"better\": \"one compliant line in the excerpts' language (English or Hinglish)\", "
+           "\"better_other\": \"the same line in the other one (English if better is Hinglish, Hinglish if English)\", "
+           "\"practice\": \"one Live Sales Buddy drill (the agent practises alone with the simulated customer), max 30 words\"}")
+    user = (f"Rule: {module['param']} {module['rule']}\nAgent profile: {who or 'not given'}\n"
+            f"Generic template line (do not copy): {module.get('better', '')}\nExcerpts:\n{ex or '(none)'}")
+    out = llm.chat_json(sys, user, temperature=0.5, max_tokens=4000)
+    tips = [str(t) for t in (out.get("tips") or []) if str(t).strip()][:4]
+    module.update(feedback=out.get("feedback", ""), strength=out.get("strength", ""), tips=tips,
+                  better=out.get("better") or module["better"], better_other=out.get("better_other", ""),
+                  practice=out.get("practice") or module["practice"], generated_by="llm")
     return module

@@ -183,11 +183,14 @@ function renderFlags() {
   $("#flag-kpis").innerHTML = [[n, "calls scored", ""], [fatal, "fatal calls", "fatal"], [fatalSale, "fatal and sold: call back", "fatal"],
     [conduct, "OTP or card asks", "major"], [review, "need a human", "review"], [avg.toFixed(0), "average score", "pass"]]
     .map(([b, s, k]) => `<div class="kpi ${k}"><b>${b}</b><span>${s}</span></div>`).join("");
-  $("#flag-alert").innerHTML = conduct ? `<div class="alert"><b>${conduct} call${conduct > 1 ? "s" : ""} where the agent asked for an OTP or card detail.</b> These skip the queue and go to the team lead and compliance now.</div>` : "";
+  const urgent = rows.filter((r) => r.s.conduct_alert);
+  $("#flag-alert").innerHTML = conduct ? `<div class="alert"><b>${conduct} call${conduct > 1 ? "s" : ""} where the agent asked for an OTP or card detail.</b> These skip the list below and go straight to the team lead and compliance. Open one:
+    <div class="alert-calls">${urgent.map(({ c, s }) => `<button class="chip FATAL" data-urgent="${c.id}">${c.id}, ${esc(c.agent)}, score ${s.score}</button>`).join(" ")}</div></div>` : "";
+  $$("[data-urgent]").forEach((b) => b.onclick = () => openCallAny(b.dataset.urgent));
   const tls = [...new Map(D.calls.map((c) => [c.team_lead_id, c.team_lead])).entries()].sort();
   if (!$("#f-tl").options.length) $("#f-tl").innerHTML = `<option value="">All teams</option>` + tls.map(([id, nm]) => `<option value="${id}">${esc(nm)} (${id})</option>`).join("");
   const tl = $("#f-tl").value, sev = $("#f-sev").value;
-  const list = rows.filter((r) => (!tl || r.c.team_lead_id === tl) && (sev === "all" || (sev === "FATAL" ? r.s.fatal.length : r.s.flags.length)));
+  const list = rows.filter((r) => !r.s.conduct_alert && (!tl || r.c.team_lead_id === tl) && (sev === "all" || (sev === "FATAL" ? r.s.fatal.length : r.s.flags.length)));
   $("#f-count").textContent = `${list.length} call${list.length === 1 ? "" : "s"}`;
   $("#qlist").innerHTML = list.slice(0, 80).map(({ c, s }) => {
     const top = s.top_issue ? s.results[s.top_issue] : null, p = s.top_issue ? D.scorecard.find((x) => x.id === s.top_issue) : null;
@@ -360,7 +363,7 @@ async function boot() {
   $("#f-tl").addEventListener("change", renderFlags); $("#f-sev").addEventListener("change", renderFlags);
   $$("#co-seg button").forEach((b) => b.addEventListener("click", () => { $$("#co-seg button").forEach((x) => x.classList.toggle("on", x === b)); coScope = b.dataset.s; fillCoachWho(); }));
   $("#co-who").addEventListener("change", fillCoachParam); $("#co-param").addEventListener("change", () => renderLesson());
-  $("#co-ai").addEventListener("click", personalise);
+  $("#co-ai").addEventListener("click", () => personalise());
   fillCoachWho();
   $("#res-seg").addEventListener("click", (e) => { const m = e.target.dataset?.m; if (m) { resMode = m; renderResults(); } });
   $("#replay-btn").addEventListener("click", heroReplay);

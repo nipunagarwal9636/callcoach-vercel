@@ -13,15 +13,16 @@ from qa.coaching import BETTER, _llm_personalise, guardrail
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            m = read_json(self).get("module") or {}
+            body = read_json(self)
+            m = body.get("module") or {}
             if not llm.available():
                 return send(self, 400, {"error": "LLM not configured on the server"})
-            m = _llm_personalise(m)
-            m["guardrail"] = guardrail(" ".join([m.get("better", ""), m.get("practice", ""), m.get("feedback", "")]))
+            m = _llm_personalise(m, body.get("profile"))
+            m["guardrail"] = guardrail(" ".join([m.get("better", ""), m.get("better_other", ""), m.get("practice", ""), m.get("feedback", ""), " ".join(m.get("tips") or [])]))
             if m["guardrail"]:
                 lang = (m.get("excerpts") or [{}])[0].get("lang", "en")
                 m["better"] = BETTER[m["param"]][1 if lang == "hi" else 0]
-                m["feedback"] = ""
+                m["feedback"] = ""; m["tips"] = []; m["better_other"] = ""
                 m["generated_by"] = "template (LLM output blocked by guardrail)"
             send(self, 200, {"module": m})
         except Exception as e:

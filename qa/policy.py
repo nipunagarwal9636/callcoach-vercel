@@ -118,13 +118,30 @@ def _cmp(said, actual, unit):
     return ("SUPPORTED" if abs(said - actual) < 1e-6 else "CONTRADICTED"), f"{actual:g} {unit}"
 
 
+NEGATED = [r"\bnot\s+(be\s+)?(covered\s+)?from\s+(day\s+one|the\s+first\s+day)", r"(pehle\s+din\s+se|day\s+one\s+se)\s*(cover\s*)?(nahi|nahin)\b(\s+(hai|hoga|milega))?",
+           r"(no|can'?t|cannot|not|never|koi)\s+(give\s+|offer\s+|make\s+)?(you\s+)?(a\s+|any\s+)?guarantee(s)?", r"guarantee\s+(nahi|nahin|nahi\s+de\s+sakta|nahi\s+de\s+sakti)",
+           r"guarantee\s+de\s+nahi\s+sak\w*", r"(nobody|no\s+one|koi\s+bhi)\s+(can\s+)?guarantee", r"\b(main|hum)\s+guarantee\s+nahi",
+           r"(no|not|nahi)\s+(a\s+)?(return|refund)\s+of\s+premium", r"premium\s+wapas\s+nahi", r"(not|nahi|no)\s+(\w+\s+){0,2}cover\s+from\s+day\s+one",
+           r"(sab|everything)\s+cover\s+nahi", r"sab\s+kuch\s+cover\s+nahi", r"not\s+(everything|all)\s+is\s+covered"]
+
+
+def clean_negations(text):
+    """Remove clauses where a risky phrase is negated ("pehle din se cover nahi hai", "I can't guarantee"), so correct lines aren't flagged."""
+    t = text
+    for p in NEGATED:
+        t = re.sub(p, " ", t, flags=I)
+    return t
+
+
 def check_statement(turn_no, text, f, doc, prev_customer=""):
     """Return findings for one agent turn against the policy facts."""
     out = []
+    said_text = text
+    text = clean_negations(text)
 
     def add(topic, verdict, policy, param, keys):
         c = clause_for(doc, *keys)
-        out.append(dict(kind="claim", topic=topic, verdict=verdict, turn=turn_no, said=text, policy=policy, param=param,
+        out.append(dict(kind="claim", topic=topic, verdict=verdict, turn=turn_no, said=said_text, policy=policy, param=param,
                         clause=c, source="rules"))
 
     low = text.lower()

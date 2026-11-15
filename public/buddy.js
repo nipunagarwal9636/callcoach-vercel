@@ -20,8 +20,11 @@ function renderBuddy() {
         <button class="btn ghost small" id="bd-reset">New call</button></span></div>
       <div class="chat" id="bd-chat"></div>
       <div class="compose"><textarea id="bd-in" rows="2" placeholder="Type what you'd say to the customer, then press Enter"></textarea>
-        ${SR ? `<button class="btn ghost mic" id="bd-mic" title="Speak (English or Hinglish)" aria-label="Speak">🎙</button>` : ""}
+        ${SR || STATUS.stt ? `<button class="btn ghost mic" id="bd-mic" title="Speak your line (English or Hinglish)" aria-pressed="false">🎙 Speak</button>` : ""}
         <button class="btn" id="bd-send">Say it</button></div>
+      <div class="micst idle" id="bd-micst" hidden></div>
+      <div class="micopts small">${SR || STATUS.stt ? `<label>Voice <select id="bd-eng">${SR ? `<option value="browser">Browser, instant captions</option>` : ""}${STATUS.stt ? `<option value="whisper">Whisper, more accurate for Hinglish</option>` : ""}</select></label>
+        <label class="toggle" style="margin:0"><input type="checkbox" id="bd-auto" ${MIC.auto ? "checked" : ""}> Send when I pause</label>` : `<span class="muted">Voice input needs Chrome or Edge. You can still type.</span>`}</div>
       <div class="cta" style="margin-top:10px"><button class="btn ghost small" id="bd-end">End call and score it</button><span class="small muted" id="bd-ms"></span></div>
     </div>
     <div class="coachp" id="bd-coach"></div>
@@ -30,10 +33,14 @@ function renderBuddy() {
   $("#bd-ai").onchange = (e) => { BUDDY.ai = e.target.checked; };
   $("#bd-free")?.addEventListener("click", () => { BUDDY.focus = null; BUDDY.turns = []; renderBuddy(); });
   $("#bd-reset").onclick = () => { BUDDY.turns = []; renderBuddy(); };
-  $("#bd-send").onclick = sendLine;
+  $("#bd-send").onclick = () => { if (MIC.on) { MIC.final = ""; clearTimeout(MIC.timer); } sendLine(); };
   $("#bd-in").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendLine(); } };
   $("#bd-end").onclick = endCall;
-  if (SR) $("#bd-mic").onclick = () => toggleMic(SR);
+  if (MIC.on) stopMic(false);
+  $("#bd-mic")?.addEventListener("click", (e) => { e.currentTarget.blur(); toggleMic(SR); });
+  const eng = $("#bd-eng"); if (eng) { if (MIC.engine && [...eng.options].some((o) => o.value === MIC.engine)) eng.value = MIC.engine;
+    eng.onchange = () => { MIC.engine = eng.value; try { localStorage.setItem("cc:mic-engine", eng.value); } catch {} if (MIC.on) stopMic(false); }; }
+  $("#bd-auto")?.addEventListener("change", (e) => { MIC.auto = e.target.checked; try { localStorage.setItem("cc:mic-auto", MIC.auto ? "1" : "0"); } catch {} });
   drawChat();
   if (!BUDDY.turns.length && STATUS.api) step(true);
   else drawCoach();
@@ -83,15 +90,115 @@ function sendLine() {
   BUDDY.turns.push({ s: "AGENT", t: v }); $("#bd-in").value = ""; step(false);
 }
 
-function toggleMic(SR) {
-  if (BUDDY.rec) { BUDDY.rec.stop(); return; }
-  const r = new SR(); r.lang = "en-IN"; toast("Listening. Speak one line; it sends when you pause."); r.interimResults = true; r.continuous = false;
-  const b = $("#bd-mic"); b.classList.add("live");
-  r.onresult = (e) => { $("#bd-in").value = [...e.results].map((x) => x[0].transcript).join(" "); };
-  r.onend = () => { b.classList.remove("live"); BUDDY.rec = null; if ($("#bd-in").value.trim()) sendLine(); };
-  r.onerror = (e) => toast("Mic: " + e.error);
-  BUDDY.rec = r; r.start();
+/* ---- Voice input: continuous browser speech (instant) or Whisper (more accurate). Auto-sends after a short pause. ---- */
+const MIC = { on: false, r: null, final: "", timer: null, engine: null, auto: true, mr: null, stream: null, ctx: null };
+try { MIC.auto = localStorage.getItem("cc:mic-auto") !== "0"; MIC.engine = localStorage.getItem("cc:mic-engine"); } catch {}
+
+function micUI(state, text) {
+  const b = $("#bd-mic"), st = $("#bd-micst"); if (!b) return;
+  b.classList.toggle("live", state === "listening"); b.classList.toggle("busy", state === "working");
+  b.setAttribute("aria-pressed", state === "listening" ? "true" : "false");
+  b.innerHTML = state === "listening" ? "■ Stop" : state === "working" ? "…" : "🎙 Speak";
+  if (st) { st.hidden = !text; st.innerHTML = text || ""; st.className = "micst " + state; }
 }
+
+function toggleMic(SR) {
+  if (MIC.on) return stopMic(true);
+  const engine = $("#bd-eng")?.value || "browser";
+  MIC.on = true; MIC.final = ""; $("#bd-in").value = "";
+  if (engine === "whisper") return startWhisper();
+  startRec(SR);
+}
+
+function stopMic(sendNow) {
+  MIC.on = false; clearTimeout(MIC.timer);
+  if (MIC.r) { try { MIC.r.abort(); } catch {} MIC.r = null; }
+  if (MIC.mr && MIC.mr.state === "recording") { MIC.sendAfter = sendNow; MIC.mr.stop(); return; }
+  cleanupStream();
+  micUI("idle", "");
+  if (sendNow && $("#bd-in")?.value.trim()) sendLine();
+}
+
+function startRec(SR) {
+  const r = new SR(); r.lang = "en-IN"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+  r.onstart = () => micUI("listening", `<span class="dot"></span> Listening. Speak naturally; ${MIC.auto ? "your line is sent after a 1.5-second pause" : "press Stop or Say it when you're done"}.`);
+  r.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tr = e.results[i][0].transcript.trim();
+      if (e.results[i].isFinal) MIC.final = (MIC.final + " " + tr).trim(); else interim += " " + tr;
+    }
+    $("#bd-in").value = (MIC.final + " " + interim).trim();
+    const st = $("#bd-micst"); if (st && interim.trim()) st.innerHTML = `<span class="dot"></span> Hearing: <i>${esc(interim.trim().slice(-80))}</i>`;
+    armSend();
+  };
+  r.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") { toast("Microphone is blocked. Allow it from the lock icon in the address bar, then try again."); stopMic(false); }
+    else if (e.error === "audio-capture") { toast("No microphone found. Plug one in or type your line."); stopMic(false); }
+    else if (e.error === "network") { toast("Browser speech needs internet. Switching to Whisper may help."); }
+    // "no-speech" and "aborted" are normal: onend restarts listening
+  };
+  r.onend = () => {
+    if (MIC.on && $("#bd-mic") && MIC.r === r) { setTimeout(() => { if (MIC.on && MIC.r === r) { try { startRec(SR); } catch { stopMic(false); } } }, 150); }
+  };
+  MIC.r = r;
+  try { r.start(); } catch { stopMic(false); }
+}
+
+function armSend() {
+  clearTimeout(MIC.timer); if (!MIC.auto) return;
+  MIC.timer = setTimeout(flushSpeech, 1500);
+}
+
+function flushSpeech() {
+  if (!MIC.on) return;
+  if (BUDDY.busy) { armSend(); return; }          // wait for the customer to finish replying
+  if (!$("#bd-in").value.trim()) return;
+  MIC.final = "";
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (MIC.r) { const old = MIC.r; MIC.r = null; try { old.abort(); } catch {} }   // drop pending words so nothing is sent twice
+  sendLine();
+  if (MIC.on && SR) setTimeout(() => MIC.on && !MIC.r && startRec(SR), 200);
+}
+
+async function startWhisper() {
+  try { MIC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch { toast("Microphone is blocked. Allow it from the lock icon in the address bar."); MIC.on = false; return micUI("idle", ""); }
+  recordWhisperLine();
+}
+
+function recordWhisperLine() {
+  if (!MIC.on || !MIC.stream) return;
+  const chunks = [], mr = new MediaRecorder(MIC.stream); MIC.mr = mr; MIC.sendAfter = MIC.auto;
+  mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  mr.onstop = async () => {
+    const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" }); MIC.mr = null;
+    if (blob.size > 3000 && heard) {
+      micUI("working", `<span class="dot"></span> Transcribing with Whisper…`);
+      try {
+        const r = await fetch("/api/transcribe", { method: "POST", headers: { "X-Filename": "buddy.webm", "Content-Type": blob.type, "X-Speaker": "AGENT" }, body: blob });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+        const txt = (j.turns || []).map((t) => t.t).join(" ").trim();
+        if (txt) { $("#bd-in").value = ($("#bd-in").value + " " + txt).trim(); if (MIC.sendAfter) sendLine(); }
+      } catch (e) { toast("Whisper: " + e.message); }
+    }
+    if (MIC.on) recordWhisperLine(); else { cleanupStream(); micUI("idle", ""); if (MIC.sendAfter === true && $("#bd-in")?.value.trim()) sendLine(); }
+  };
+  // simple voice-activity detection: stop after 1.5 s of quiet once speech was heard (max 30 s)
+  MIC.ctx = MIC.ctx || new (window.AudioContext || window.webkitAudioContext)();
+  const src = MIC.ctx.createMediaStreamSource(MIC.stream), an = MIC.ctx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+  const buf = new Float32Array(an.fftSize); let heard = false, quietSince = 0; const t0 = Date.now();
+  const tick = () => {
+    if (mr.state !== "recording") return;
+    an.getFloatTimeDomainData(buf); let sum = 0; for (const v of buf) sum += v * v; const rms = Math.sqrt(sum / buf.length);
+    if (rms > 0.02) { heard = true; quietSince = 0; } else if (heard && !quietSince) quietSince = Date.now();
+    if ((MIC.auto && heard && quietSince && Date.now() - quietSince > 1500) || Date.now() - t0 > 30000) return mr.stop();
+    requestAnimationFrame(tick);
+  };
+  mr.start(); micUI("listening", `<span class="dot"></span> Listening (Whisper). ${MIC.auto ? "Your line is transcribed and sent when you pause." : "Press Stop when you're done."}`); tick();
+}
+
+function cleanupStream() { MIC.stream?.getTracks().forEach((t) => t.stop()); MIC.stream = null; }
 
 async function endCall() {
   if (!BUDDY.turns.some((t) => t.s === "AGENT")) return toast("Say something first");
@@ -116,3 +223,5 @@ async function endCall() {
 }
 
 RENDER.buddy = renderBuddy;
+
+window.addEventListener("hashchange", () => { if (MIC.on && location.hash !== "#buddy") stopMic(false); });

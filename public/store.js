@@ -17,7 +17,7 @@ const pname = (p) => D.scorecard.find((x) => x.id === p)?.name || p;
 const psev = (p) => D.scorecard.find((x) => x.id === p)?.severity || "MINOR";
 
 const ROLE_NAME = { admin: "Admin", qa: "QA auditor", tl: "Team lead", agent: "Agent" };
-function me() { const u = window.Auth && Auth.user(); return u ? { name: u.name, role: ROLE_NAME[u.role] || u.role, id: u.u } : Store.get("me", { name: "", role: "QA auditor" }); }
+function me() { const u = typeof Auth !== "undefined" && Auth.user(); return u ? { name: u.name, role: ROLE_NAME[u.role] || u.role, id: u.u } : Store.get("me", { name: "", role: "QA auditor" }); }
 function needMe() { return me(); }
 
 /* ---- SHA-256 hash chain ---- */
@@ -142,18 +142,25 @@ function reviewItems() {
   const dec = Store.get("decisions", {});
   const items = D.calls.map((c) => ({ id: c.id, call: c, s: c.scored[D.modes[0]], live: false }))
     .concat(Store.get("liveQueue", []).map((x) => ({ id: x.id, call: x.call, s: x.s, live: true })))
-    .concat((Feed.cache || []).filter((x) => !D.calls.find((c) => c.id === x.id)).map((x) => ({ id: x.id, call: { id: x.id, agent: x.agent || x.agent_id, agent_id: x.agent_id, team_lead: x.team_lead_id, team_lead_id: x.team_lead_id, product: x.product || "LIVE", language: x.language || "-", outcome: x.s.sale ? "SALE" : "UNKNOWN", turns: x.turns, labels: null }, s: x.s, live: true })))
+    .concat((Feed.cache || []).filter((x) => !D.calls.find((c) => c.id === x.id)).map((x) => ({ id: x.id, call: { id: x.id, agent: x.agent || x.agent_id, agent_id: x.agent_id, team_lead: x.team_lead_id, team_lead_id: x.team_lead_id, product: x.product || "LIVE", language: x.language || "-", outcome: x.s.sale ? "SALE" : "UNKNOWN", turns: x.turns, labels: null, live_alerts: x.live_alerts, source: x.source, by: x.by }, s: x.s, live: true })))
     .filter((x) => x.s.fatal.length || x.s.review.length || x.s.conduct_alert);
   return items.map((x) => ({ ...x, done: !!dec[x.id]?.signed, dec: dec[x.id] }))
-    .sort((a, b) => (a.done - b.done) || (b.s.priority - a.s.priority));
+    .sort((a, b) => (a.done - b.done) || (b.live - a.live) || (b.s.priority - a.s.priority));
 }
 ONBOOT.push(updateBadges);
 
+function liveAlertsHTML(list) {
+  if (!list?.length) return "";
+  return `<div class="panel la"><h3>Flagged live during the call</h3><p class="small muted" style="margin:2px 0 10px">What the coach caught while the call was happening, and whether the agent fixed it before the call ended.</p>
+    ${list.map((l) => `<div class="la-r ${l.fixed ? "ok" : l.level}"><span class="chip ${l.level === "fatal" ? "FATAL" : "MAJOR"}">${esc(l.param)}</span><div><b>${esc(l.title)}</b>${l.at ? ` <span class="small muted">${l.at}</span>` : ""}
+      <div class="small">Said: <s>${esc(l.said)}</s></div>${l.used ? `<div class="small">Suggestion used: “${esc(l.used)}”</div>` : ""}</div><span class="chip ${l.fixed ? "MET" : "NA"}">${l.fixed ? "Corrected on the call" : "Not corrected"}</span></div>`).join("")}</div>`;
+}
+
 /* "Share this scored call" block used by Score a call and Live call */
-function shareUI(box, s, turns, source, presetAgent) {
+function shareUI(box, s, turns, source, presetAgent, extra = {}) {
   const u = Auth.user(), id = "NEW-" + new Date().toISOString().slice(5, 16).replace(/[-T:]/g, "") + Math.random().toString(36).slice(2, 4).toUpperCase();
-  const pack = (a) => ({ id, agent_id: a.id, team_lead_id: a.team_lead_id, agent: a.name, s, turns, source, sale: !!s.sale });
-  const done = (a) => { box.innerHTML = `<div class="shared">${svg("review", 16)} <span>Shared with <b>${esc(a.name)}</b> and team lead <b>${esc(a.team_lead)}</b>. It's on their dashboards now${s.fatal.length || s.review.length ? ", and in the QA review queue" : ""}.</span></div>`; };
+  const pack = (a) => ({ id, agent_id: a.id, team_lead_id: a.team_lead_id, agent: a.name, s, turns, source, sale: !!s.sale, ...extra });
+  const done = (a) => { box.innerHTML = `<div class="shared">${svg("review", 16)} <span>${u.role === "agent" ? `Sent to your team lead <b>${esc(a.team_lead)}</b>` : `Shared with <b>${esc(a.name)}</b> and team lead <b>${esc(a.team_lead)}</b>`}. It's on their dashboards now${s.fatal.length || s.review.length ? ", and in the QA review queue" : ". No fatal error, so QA review isn't needed"}.</span></div>`; };
   if (u.role === "agent") { const a = me_agent(); Feed.add(pack(a)).then(() => done(a)); box.innerHTML = `<span class="small muted">Sharing with your team lead…</span>`; return; }
   const list = D.agents.agents.filter((a) => u.role !== "tl" || a.team_lead_id === u.team).sort((a, b) => a.name.localeCompare(b.name));
   const pre = presetAgent || Store.get("lastAgent", "");

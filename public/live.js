@@ -31,6 +31,7 @@ function renderLive() {
     </div>
     ${!SR_ && !STATUS.stt ? `<div class="alert" style="margin:10px 0 0">This browser can't transcribe speech. Open the app in Chrome or Edge, or add STT_PROVIDER and STT_API_KEY for Whisper. "Play a sample call" works everywhere.</div>` : ""}
   </div>
+  ${role().role === "agent" ? `<div class="newbar">${svg("review", 16)} <span>When you stop or end the call, it's scored and sent to your team lead <b>${esc(me_agent().team_lead)}</b>${" "}automatically. Fatal errors also go to QA for review.${LIVE.shared ? " <b>This call has been sent.</b>" : ""}</span></div>` : ""}
   <div class="grid-live">
     <div class="panel"><div class="spk" id="lv-spk"></div><div class="lv-tx" id="lv-tx"></div></div>
     <div id="lv-dash"></div>
@@ -38,7 +39,7 @@ function renderLive() {
   $("#lv-go").onclick = () => (LIVE.on ? stopListening() : startListening());
   $("#lv-sample").onclick = () => (LIVE.playing ? (LIVE.playing = false) : playSample());
   $("#lv-end").onclick = endLive;
-  $("#lv-clear").onclick = () => { if (LIVE.on) stopListening(); Object.assign(LIVE, { turns: [], log: [], seen: new Set(), coach: null, interim: "", ms: [] }); renderLive(); };
+  $("#lv-clear").onclick = () => { if (LIVE.on) stopListening(); Object.assign(LIVE, { turns: [], log: [], seen: new Set(), coach: null, interim: "", ms: [], shared: false }); renderLive(); };
   $("#lv-engine").onchange = (e) => (LIVE.engine = e.target.value);
   $("#lv-lang").onchange = (e) => (LIVE.lang = e.target.value);
   $("#lv-mode").onchange = (e) => { LIVE.mode = e.target.value; renderLive(); if (LIVE.mode === "voice" && !LIVE.voice) calibrate(); };
@@ -68,29 +69,45 @@ function drawTx() {
   box.innerHTML = (LIVE.turns.length || LIVE.interim ? "" : `<div class="empty">Press <b>Start listening</b> and talk, or play a sample call. Lines appear here as they're spoken.</div>`)
     + LIVE.turns.map((t, i) => { const a = bad.get(t.id);
       return `<div class="lv-line ${t.s === "AGENT" ? "ag" : "cu"} ${a ? "hit-" + a.level : ""}"><button class="who" data-flip="${i}" title="Click to switch speaker">${t.s === "AGENT" ? "Agent" : "Customer"}</button>
-        <div><p>${a && t.s === "AGENT" ? `<mark>${esc(t.t)}</mark>` : esc(t.t)}</p>${LIVE.log.filter((l) => l.tid === t.id).map((l) => `<span class="msg-flag ${l.level}">${esc(l.title)}</span>`).join(" ")}</div><span class="small muted">${t.at}${t.how ? `<br><span class="how">${t.how}</span>` : ""}</span></div>`; }).join("")
+        <div><p>${a && t.s === "AGENT" ? `<mark>${esc(t.t)}</mark>` : esc(t.t)}</p>${LIVE.log.filter((l) => l.tid === t.id).map((l) => `<span class="msg-flag ${l.level}">${esc(l.title)}</span>`).join(" ")}
+          ${LIVE.log.filter((l) => l.tid === t.id).map((l) => suggHTML(l)).join("")}</div><span class="small muted">${t.at}${t.how ? `<br><span class="how">${t.how}</span>` : ""}</span></div>`; }).join("")
     + (LIVE.interim ? `<div class="lv-line interim ${LIVE.speaker === "AGENT" ? "ag" : "cu"}"><span class="who">${LIVE.mode === "manual" ? (LIVE.speaker === "AGENT" ? "Agent" : "Customer") : "…"}</span><div><p>${esc(LIVE.interim)}</p></div></div>` : "");
+  wireSugg(box);
   $$("[data-flip]", box).forEach((b) => b.onclick = () => { const t = LIVE.turns[+b.dataset.flip]; t.s = t.s === "AGENT" ? "CUSTOMER" : "AGENT"; drawTx(); analyse(); });
   box.scrollTop = box.scrollHeight;
 }
 
+function suggHTML(l) {
+  const k = LIVE.log.indexOf(l), opts = [l.fix, ...(l.alts || [])].filter(Boolean).slice(0, 3);
+  return `<div class="sugg ${l.fixed ? "done" : ""}"><span class="sg-h">${l.fixed ? "Fixed on the call" : "Say instead, click to use"}</span>
+    ${opts.map((o, i) => `<button class="sg ${l.used === o ? "on" : ""}" data-sug="${k}" data-i="${i}">${l.used === o ? "✓ " : ""}${esc(o)}</button>`).join("")}
+    ${l.fixed ? "" : `<button class="sg-fix" data-fixed="${k}">Agent corrected it</button>`}</div>`;
+}
+function wireSugg(root) {
+  $$("[data-sug]", root).forEach((b) => b.onclick = () => {
+    const l = LIVE.log[+b.dataset.sug], text = [l.fix, ...(l.alts || [])].filter(Boolean)[+b.dataset.i];
+    l.used = text; navigator.clipboard?.writeText(text)?.catch(() => {}); toast("Copied. Say it now, then mark it corrected"); drawTx(); drawDash();
+  });
+  $$("[data-fixed]", root).forEach((b) => b.onclick = () => { const l = LIVE.log[+b.dataset.fixed]; l.fixed = Date.now(); toast("Marked as corrected on the call"); drawTx(); drawDash(); });
+}
+
 function drawDash() {
   const d = $("#lv-dash"); if (!d) return;
-  const k = LIVE.coach, fatal = LIVE.log.filter((l) => l.level === "fatal"), major = LIVE.log.filter((l) => l.level !== "fatal");
+  const k = LIVE.coach, fatal = LIVE.log.filter((l) => l.level === "fatal" && !l.fixed), major = LIVE.log.filter((l) => l.level !== "fatal" && !l.fixed), fixedN = LIVE.log.filter((l) => l.fixed).length;
   const state = fatal.length ? "fatal" : major.length ? "warn" : "clean";
   const latest = LIVE.log[LIVE.log.length - 1];
   const avg = LIVE.ms.length ? Math.round(LIVE.ms.reduce((a, b) => a + b, 0) / LIVE.ms.length) : null;
   d.innerHTML = `<div class="light ${state}"><div class="lamp"></div><div><b>${state === "fatal" ? `${fatal.length} fatal error${fatal.length > 1 ? "s" : ""}` : state === "warn" ? `${major.length} warning${major.length > 1 ? "s" : ""}` : "Clean so far"}</b>
-      <span>${state === "fatal" ? "Fix it on this call, before it ends" : state === "warn" ? "Not fatal, but coach it" : LIVE.turns.length ? "No rule broken yet" : "Waiting for the call to start"}</span></div>
+      <span>${state === "fatal" ? "Fix it on this call, before it ends" : state === "warn" ? "Not fatal, but coach it" : fixedN ? `${fixedN} corrected on the call` : LIVE.turns.length ? "No rule broken yet" : "Waiting for the call to start"}${fixedN && state !== "clean" ? `, ${fixedN} corrected` : ""}</span></div>
       ${k ? `<div class="lmeter"><b>${k.meter}</b><span>compliance</span></div>` : ""}</div>
     ${latest ? `<div class="fixnow ${latest.level}"><span class="small">${latest.level === "fatal" ? "Fatal" : "Warning"}, ${latest.at}: ${esc(latest.param)}</span><h3>${esc(latest.title)}</h3>
       <p class="small">Agent said: <s>${esc(latest.said.slice(0, 160))}</s></p>
-      <div class="say"><span class="small muted">Fix it now. Say this</span><p>${esc(latest.fix)}</p><button class="linkbtn" data-copy="${esc(latest.fix)}">Copy line</button></div></div>` : ""}
+      ${suggHTML(latest)}</div>` : ""}
     ${k && k.nudges.length ? `<div class="panel"><h4>Next best line for the agent</h4>${k.nudges.map((n) => `<div class="nudge ${n.urgent ? "urgent" : ""}"><span class="small"><b>${esc(n.why)}</b></span><p>${esc(n.say)}</p></div>`).join("")}</div>` : ""}
     ${LIVE.log.length > 1 ? `<div class="panel"><h4>Everything flagged on this call</h4><ul class="evlog">${LIVE.log.slice().reverse().map((l) => `<li class="${l.level}"><span class="chip ${l.level === "fatal" ? "FATAL" : l.level === "major" ? "MAJOR" : "MINOR"}">${esc(l.param)}</span><span>${esc(l.title)}</span><span class="small muted">${l.at}</span></li>`).join("")}</ul></div>` : ""}
     ${k ? `<div class="panel"><h4>Checklist</h4><ul class="check">${k.checklist.map((c) => `<li class="${c.state}"><span class="ic">${{ done: "✓", ok: "✓", todo: "○", fail: "✗" }[c.state]}</span><span>${c.id} ${esc(c.label)}${c.items ? `<ul>${c.items.map((x) => `<li class="${x.done ? "done" : "todo"}">${x.done ? "✓" : "○"} ${esc(x.label)}</li>`).join("")}</ul>` : ""}</span></li>`).join("")}</ul>
       ${avg != null ? `<p class="small muted" style="margin-top:8px">Checked in ${avg} ms per line on average.</p>` : ""}</div>` : ""}`;
-  $$("[data-copy]", d).forEach((b) => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy); toast("Copied"); });
+  wireSugg(d);
   document.body.classList.toggle("live-fatal", state === "fatal" && LIVE.on);
 }
 
@@ -137,7 +154,7 @@ async function analyse() {
       const key = lastAgent.id + "|" + a.title;
       if (LIVE.seen.has(key)) continue;
       LIVE.seen.add(key);
-      fresh = { ...a, tid: lastAgent.id, at: lastAgent.at || "" }; LIVE.log.push(fresh);
+      fresh = { ...a, tid: lastAgent.id, at: lastAgent.at || "", alts: (a.param === "P5" || a.param === "P7" ? j.coach.nudges.filter((n) => n.urgent && (a.param === "P5" ? /illness|disclose/i : /time|follow/i).test(n.why)).map((n) => n.say) : []).filter((x) => x !== a.fix).slice(0, 2) }; LIVE.log.push(fresh);
     }
     if (fresh) { flash(fresh.level); drawTx(); }
   } catch (e) { toast("Live check: " + e.message); }
@@ -305,6 +322,7 @@ function stopListening() {
   LIVE.tab?.getTracks().forEach((t) => t.stop()); LIVE.tab = null;
   meterStop();
   LIVE.interim = ""; document.body.classList.remove("live-fatal"); renderLive();
+  if (role().role === "agent" && LIVE.turns.filter((t) => t.s === "AGENT").length >= 2 && !LIVE.shared) { toast("Scoring your call and sending it to your team lead"); endLive(); }
 }
 
 function howTo() {
@@ -340,7 +358,7 @@ const SAMPLE = [
 ];
 async function playSample() {
   if (LIVE.on) stopListening();
-  Object.assign(LIVE, { turns: [], log: [], seen: new Set(), coach: null, interim: "", ms: [], playing: true, t0: Date.now(), plan: "insurer-b-health-secure-plus" });
+  Object.assign(LIVE, { turns: [], log: [], seen: new Set(), coach: null, interim: "", ms: [], shared: false, playing: true, t0: Date.now(), plan: "insurer-b-health-secure-plus" });
   renderLive();
   for (const [s, t] of SAMPLE) {
     if (!LIVE.playing) break;
@@ -371,7 +389,8 @@ async function endLive() {
       ${pol ? `<div class="panel" style="margin-bottom:16px"><h3 style="margin-bottom:8px">Against the policy wording</h3>${findingsHTML(pol, { limit: 6 })}</div>` : ""}
       ${resultBlock(j.result, j.turns, null)}`;
     animateRings(body);
-    shareUI($(".lv-share", body), j.result, j.turns, "Live call");
+    shareUI($(".lv-share", body), j.result, j.turns, "Live call", null, { live_alerts: LIVE.log.map((l) => ({ param: l.param, title: l.title, level: l.level, said: l.said, fix: l.fix, used: l.used || null, fixed: !!l.fixed, at: l.at })) });
+    LIVE.shared = role().role === "agent";
   } catch (e) { $("#lv-sum", body).innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 

@@ -162,11 +162,17 @@ M_ADDON = rx(r"zero dep\w*[^.]{0,40}(limit|claims? a year|do claim|two claims)",
 PAY_TURN = rx(r"premium\b[^.]{0,30}(₹|\brs\.?|\brupees)\s?\d", r"payment link|secure link|link (bhej|send)", r"\botp\b")
 
 
+def _clean(text):
+    """Drop negated risky phrases ("pehle din se cover nahi hai") so a correct line isn't flagged."""
+    from .policy import clean_negations
+    return clean_negations(text)
+
+
 def p5(call):
     agent = _agent_turns(call)
     # 1) Misstatements (worst pattern), judged against the customer's preceding question
     for t in agent:
-        if MISSTATE.search(t.text):
+        if MISSTATE.search(_clean(t.text)):
             prev = _prev_customer(call, t.no)
             ctx = prev.text if prev else ""
             if HEALTH_COND.search(ctx) or ASK_LIMIT.search(ctx):
@@ -204,7 +210,7 @@ NO_PROMISE = rx(r"(no|can'?t|cannot|not|nahi)\s+(a\s+)?guarantee", r"guarantee n
 
 def p6(call):
     for t in _agent_turns(call):
-        if PROMISE.search(t.text) and not NO_PROMISE.search(t.text):
+        if PROMISE.search(_clean(t.text)) and not NO_PROMISE.search(t.text):
             return Finding("P6", "NOT_MET", [t.no], t.text, "False promise about claims, returns or benefits", 0.95)
     return Finding("P6", "MET", reason="No guarantees or promised returns", confidence=0.85)
 

@@ -172,26 +172,26 @@ def coach(turns, persona_id="ramesh", docs=None, plan_id=None):
     # red alerts on the latest agent line
     if agent:
         last = agent[-1]
-        lt = last["t"]
+        lt = policy.clean_negations(last["t"])
         prevc = " ".join(t["t"] for t in cust if t["n"] < last["n"])
         if OTP_ASK.search(lt) and not OTP_SAFE.search(lt):
-            alerts.append(dict(level="fatal", title="Never ask for an OTP", said=lt, fix=_line("P8", lang), param="P8"))
+            alerts.append(dict(level="fatal", title="Never ask for an OTP", said=last["t"], fix=_line("P8", lang), param="P8"))
         ill_any = next((t for t in turns if t["n"] < last["n"] and re.search(policy.HEALTH_WORDS, t["t"], I)), None)
         if MISSTATE.search(lt) and (illness or ill_any) and (illness or ill_any)["n"] < last["n"]:
-            alerts.append(dict(level="fatal", title="Don't say 'it's covered' to an existing illness", said=lt, fix=ped_line(f, lang) if f.get("ped_wait_months") else _line("P5", lang), param="P5"))
+            alerts.append(dict(level="fatal", title="Don't say 'it's covered' to an existing illness", said=last["t"], fix=ped_line(f, lang) if f.get("ped_wait_months") else _line("P5", lang), param="P5"))
         if (PROMISE.search(lt) or SPOKEN_PROMISE.search(lt)) and not NO_PROMISE.search(lt):
-            alerts.append(dict(level="fatal", title="That's a false promise", said=lt, fix=_line("P6", lang), param="P6"))
+            alerts.append(dict(level="fatal", title="That's a false promise", said=last["t"], fix=_line("P6", lang), param="P6"))
         if PRESSURE.search(lt):
-            alerts.append(dict(level="major", title="That's pressure selling", said=lt, fix=_line("P7", lang), param="P7"))
+            alerts.append(dict(level="major", title="That's pressure selling", said=last["t"], fix=_line("P7", lang), param="P7"))
         if OVERCLAIM.search(lt):
-            alerts.append(dict(level="major", title="Cashless is only at network hospitals/garages", said=lt, fix=_line("P4", lang), param="P4"))
+            alerts.append(dict(level="major", title="Cashless is only at network hospitals/garages", said=last["t"], fix=_line("P4", lang), param="P4"))
         if DISMISS.search(lt):
-            alerts.append(dict(level="minor", title="Sounds dismissive", said=lt, fix=_line("P9", lang), param="P9"))
+            alerts.append(dict(level="minor", title="Sounds dismissive", said=last["t"], fix=_line("P9", lang), param="P9"))
         if doc:
             for x in policy.check_statement(last["n"], lt, f, doc, prevc):
                 if x["verdict"] == "CONTRADICTED" and not any(a["param"] == x["param"] for a in alerts):
                     alerts.append(dict(level="fatal" if x["param"] in ("P5", "P6") else "major", title=f"Policy says otherwise: {x['topic']}",
-                                       said=lt, fix=f"Policy {x['clause']['id'] if x['clause'] else ''}: {x['policy']}", param=x["param"]))
+                                       said=last["t"], fix=f"Policy {x['clause']['id'] if x['clause'] else ''}: {x['policy']}", param=x["param"]))
 
     # next-best nudges, most urgent first
     if not agent:

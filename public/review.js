@@ -73,9 +73,10 @@ function drawDetail(x) {
   const decided = need.every((n) => dec.items[n.key]?.d);
   const fs = finalScore(x.s, dec);
   const other = D.order.filter((p) => x.s.results[p].result === "NOT_MET" && psev(p) !== "FATAL");
-  box.innerHTML = `<div class="panel"><div class="rv-head"><div><h3>${x.id}: ${esc(x.call.agent)}</h3><p class="small muted">${esc(x.call.team_lead)}, ${String(x.call.product).replace("_", " ").toLowerCase()}, ${x.call.language}, ${String(x.call.outcome).toLowerCase().replace("_", " ")}${x.call.premium ? ", premium " + inr(x.call.premium) : ""}</p></div>
+  box.innerHTML = `<div class="panel"><div class="rv-head"><div><h3>${x.id}: ${esc(x.call.agent)}</h3><p class="small muted">${[x.call.team_lead === x.call.team_lead_id ? "Team " + x.call.team_lead : x.call.team_lead, x.live ? (x.call.source || "live call").toLowerCase() : String(x.call.product).replace("_", " ").toLowerCase(), x.call.language !== "-" ? x.call.language : "", x.live ? (x.call.outcome === "SALE" ? "ended in a sale" : "no sale on the call") : String(x.call.outcome).toLowerCase().replace("_", " ")].filter(Boolean).map(esc).join(", ")}${x.call.premium ? ", premium " + inr(x.call.premium) : ""}</p></div>
       <div class="rv-score"><span class="small muted">AI score</span><b>${x.s.score}</b>${dec.signed ? `<span class="small muted">Final</span><b style="color:var(--pass)">${dec.signed.final}</b>` : ""}</div></div>
-    <div class="routes" style="margin:8px 0 14px">${routes(x.s)}</div>
+    <div class="routes" style="margin:8px 0 14px">${routes(x.s)}${x.call.source ? `<span class="chip ink">${esc(x.call.source)}${x.call.by ? ", by " + esc(x.call.by) : ""}</span>` : ""}</div>
+    ${liveAlertsHTML(x.call.live_alerts)}
     ${need.map((n) => {
       const d = dec.items[n.key];
       return `<div class="rv-find ${d ? (d.d === "confirm" ? "conf" : "over") : ""}" data-k="${n.key}">
