@@ -83,6 +83,7 @@ async function homeAgent() {
       ${lastPrac ? ` Last practice: ${lastPrac.focus ? lastPrac.focus + ", " : ""}score ${lastPrac.score}.` : ""} ${newOnes.length ? `<b>${newOnes.length} new scored call${newOnes.length > 1 ? "s" : ""} since then.</b>` : ""}</p></div></div>
     <button class="profile-chip" id="me-prof"><span>${a.id}</span><span>${a.team_lead_id}, ${esc(a.team_lead)}</span><span>${a.tenure} months${a.certified ? "" : ", not yet certified"}</span><span class="linkbtn">My profile</span></button></div>
     ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${f.id}, score ${f.s.score}${f.s.fatal.length ? `, fatal ${f.s.fatal.join(" ")}` : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
+    ${myCallbacksHTML(a)}
     <div class="tiles">${tile("customers", "agents", log.length, "Customers contacted", `${new Set(log.map((l) => l.src)).size} lead sources`)}
       ${tile("calls", "demo", log.length, "Calls done", `${fmtMin(Math.round(log.reduce((s, l) => s + l.sec, 0) / Math.max(1, log.length)))} average`)}
       ${tile("sales", "roi", sales.length, "Converted sales", `${pct(sales.length / Math.max(1, log.length))} conversion, ${crore(sales.reduce((s, l) => s + l.prem, 0))}`, "pass")}
@@ -99,8 +100,25 @@ async function homeAgent() {
   wireDetail($("#v-home"));
   $("#seen")?.addEventListener("click", () => { Feed.markSeen(); homeAgent(); });
   $("#me-prof").onclick = () => profileDrawer(a);
+  $$("[data-cbs]").forEach((b) => b.onclick = () => showScript(b.dataset.cbs));
+  $$("[data-cbl]").forEach((b) => b.onclick = () => logCallback(b.dataset.cbl, () => homeAgent()));
   scoreChart($("#me-ch"), a);
 }
+/* Callbacks a team lead assigned to this agent: to do, waiting for approval, recently approved. */
+function myCallbacksHTML(a) {
+  const mine = Object.values(cases()).filter((c) => c.assignee === a.id);
+  if (!mine.length) return "";
+  const todo = mine.filter((c) => c.status === "tocall"), wait = mine.filter((c) => c.status === "contacted"),
+    done = mine.filter((c) => c.status === "resolved").sort((x, y) => (y.closed || 0) - (x.closed || 0)).slice(0, 3);
+  const row = (c, body) => `<div class="cb-row"><div><b>${c.id}</b> <span class="small muted">${esc(c.snap?.plan || String(c.snap?.product || "").toLowerCase())}${c.snap?.premium ? `, ${inr(c.snap.premium)}` : ""}</span>
+      <div class="routes" style="margin-top:4px">${c.fatal.map((p) => `<span class="chip FATAL">${p} ${esc(pname(p))}</span>`).join("")}</div></div>${body}</div>`;
+  return `<div class="panel callbacks"><div class="det-h"><h3>${svg("recovery", 18)} Callbacks assigned to you</h3><span class="small muted">From your team lead. Call within 48 hours.</span></div>
+    ${todo.map((c) => row(c, `<div class="cb-r">${c.sentBack ? `<span class="small sentback">Sent back: ${esc(c.sentBack)}</span>` : `<span class="small muted">Assigned ${when(c.assigned)} by ${esc(c.assignedBy || "your team lead")}</span>`}
+      <div class="cta"><button class="btn ghost small" data-cbs="${c.id}">Script</button><button class="btn small" data-cbl="${c.id}">Log the callback</button></div></div>`)).join("")}
+    ${wait.map((c) => row(c, `<div class="cb-r"><span class="chip REVIEW">Waiting for approval</span><span class="small muted">${esc(OUTCOMES[c.report?.outcome] || "")}</span></div>`)).join("")}
+    ${done.map((c) => row(c, `<div class="cb-r"><span class="chip MET">Approved by ${esc(c.approved?.by || "team lead")}</span><span class="small muted">${esc(OUTCOMES[c.outcome] || "")}</span></div>`)).join("")}</div>`;
+}
+
 function profileDrawer(a) {
   drawer(`<div class="pd-h"><span class="av big agent">${a.name.split(" ").map((w) => w[0]).join("")}</span><div><h2>${esc(a.name)}</h2><p class="muted">${a.id}</p></div></div>
     <table class="t" style="margin-top:16px"><tbody>${[["Team lead", `${a.team_lead} (${a.team_lead_id})`], ["Tenure", `${a.tenure} months`], ["Experience before PolicyNest", a.prior], ["Languages", a.languages],
@@ -152,7 +170,7 @@ async function homeTL() {
       <p class="mem">${team}: ${agents.length} agents. ${newOnes.length ? `<b>${newOnes.length} new scored call${newOnes.length > 1 ? "s" : ""} from your team.</b>` : "No new scored calls since your last visit."}</p></div></div></div>
     ${newOnes.length ? `<div class="newbar">${svg("demo", 16)} <b>New:</b> ${newOnes.map((f) => `<button class="linkbtn" data-call="${f.id}">${esc(f.agent || f.agent_id)}: ${f.id}, score ${f.s.score}${f.s.fatal.length ? `, fatal ${f.s.fatal.join(" ")}` : ""}</button>`).join(", ")} <button class="linkbtn" id="seen">Mark seen</button></div>` : ""}
     <div class="tiles">${tile("fatal", "review", fatal.length + feed.filter((f) => f.s.fatal.length).length, "Calls with a fatal error", "scored by AI", "fatal")}
-      ${tile("callbacks", "recovery", open.length, "Customer callbacks open", "fatal error on a sale", open.length ? "major" : "pass")}
+      ${tile("callbacks", "recovery", open.length, "Customer callbacks open", open.filter((c) => c.status === "contacted" && c.report).length ? `${open.filter((c) => c.status === "contacted" && c.report).length} waiting for your approval` : "fatal error on a sale", open.length ? "major" : "pass")}
       ${tile("coach", "coaching", needCoach.length, "Agents to coach", "ranked by risk", "review")}
       ${tile("agents", "agents", agents.length, "Agents", `${agents.filter((a) => !a.certified).length} not certified`)}
       ${tile("conv", "roi", pct(sales.length / Math.max(1, log.length)), "Team conversion", `${sales.length} sales, ${sales.filter((s) => s.fl).length} cancelled`, "pass")}
@@ -237,7 +255,7 @@ async function homeAdmin() {
     <div class="panel" style="margin-top:20px"><h3>Accounts</h3><p class="small muted" style="margin:2px 0 10px">Everyone signs in with their own ID and sees only their slice; the server filters the data.</p>
       <div class="grid3"><div class="acct"><b>${users.agent}</b> agents<span class="small muted">Sign in with their ID, e.g. SA-001</span></div><div class="acct"><b>${users.tl}</b> team leads<span class="small muted">e.g. TL-3</span></div><div class="acct"><b>${users.qa}</b> QA auditors<span class="small muted">e.g. QA-1</span></div></div></div>`;
   wireTiles($("#v-home"), (k) => {
-    if (k === "teams") { const T = D.patterns.teams; return `<div class="det-h"><h3>Teams side by side</h3><a class="btn small" href="#patterns">Floor patterns</a></div><div class="tablewrap"><table class="t"><thead><tr><th>Team</th><th class="num">Audits</th><th class="num">Fatal</th><th class="num">Disclosure fails</th><th class="num">Pressure</th><th class="num">Avg score</th></tr></thead><tbody>${T.map((t) => `<tr><td><b>${t.id}</b> ${esc(t.team_lead)}</td><td class="num">${t.audits}</td><td class="num">${pct(t.fatal)}</td><td class="num">${pct(t.disclosure_fail)}</td><td class="num">${pct(t.pressure_fail)}</td><td class="num">${t.avg_score.toFixed(0)}</td></tr>`).join("")}</tbody></table></div>`; }
+    if (k === "teams") { const T = D.patterns.teams; return `<div class="det-h"><h3>Teams side by side</h3></div><div class="tablewrap"><table class="t"><thead><tr><th>Team</th><th class="num">Audits</th><th class="num">Fatal</th><th class="num">Disclosure fails</th><th class="num">Pressure</th><th class="num">Avg score</th></tr></thead><tbody>${T.map((t) => `<tr><td><b>${t.id}</b> ${esc(t.team_lead)}</td><td class="num">${t.audits}</td><td class="num">${pct(t.fatal)}</td><td class="num">${pct(t.disclosure_fail)}</td><td class="num">${pct(t.pressure_fail)}</td><td class="num">${t.avg_score.toFixed(0)}</td></tr>`).join("")}</tbody></table></div>`; }
     if (k === "roi") return `<div class="det-h"><h3>Monthly P&amp;L</h3><a class="btn small" href="#roi">Open P&amp;L</a></div><div class="kpis k4"><div class="kpi pass"><b>${crore(roi.net)}</b><span>net a month</span></div><div class="kpi"><b>${crore(roi.net * 12)}</b><span>a year</span></div><div class="kpi"><b>${Math.round(roi.reviewHours)} h</b><span>human review time</span></div><div class="kpi"><b>₹${roi.perCall.toFixed(2)}</b><span>all-in cost per call</span></div></div>`;
     if (k === "review") return qaDetail("wait", { waiting: items.filter((x) => !x.done) });
     if (k === "callbacks") return tlDetail("callbacks", { open });

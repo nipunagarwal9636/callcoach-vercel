@@ -10,11 +10,11 @@ The product is one loop: **Detect → Decide → Fix → Prevent → Prove**.
 | Detect | Policy check | Checks what the agent said against the plan's policy wording, clause by clause, with citations. Upload any policy PDF |
 | Decide | Review queue | QA auditor confirms or overturns each fatal/unsure finding; every action on a SHA-256 hash-chained audit trail (verify, tamper test, CSV export) |
 | Decide | Today's flags | Team lead's ranked queue |
-| Fix | Customer recovery | Fatal error on a sale → callback case, 48-hour timer, script filled with the plan's correct facts, outcome tracking |
+| Fix | Customer recovery | Fatal error on a sale → callback case; team lead assigns it to an agent, the agent logs the outcome, the team lead approves or sends it back; 48-hour timer and a courtesy-call script |
 | Fix | Coaching / Agents | Modules from the agent's own calls; agent dashboard from 359 audits: trend, mistakes, before/after coaching |
 | Prevent | Live Sales Buddy | Role-play with a simulated customer (scripted, or AI with a key); a live coach flags risky lines and suggests the next best line; voice input in Chrome |
 | Prove | Accuracy | Run the deployed engine on the stress set or all 110 labelled calls live, with the AI judge on; metrics, latency, export |
-| Prove | Floor patterns, P&L and ROI | Root causes; monthly P&L with the brief's numbers and editable, labelled assumptions; break-even and payback |
+| Prove | P&L and ROI | One answer (saved each month) with three scenarios, where the money comes from, payback; assumptions editable under "Change the numbers" |
 
 ## Accounts (each role sees only its own data)
 

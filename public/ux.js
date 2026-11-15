@@ -18,7 +18,7 @@ const ICONS = {
 const svg = (k, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] || ""}</svg>`;
 const STAGE = { overview: ["", "Overview"], live: ["Detect", "Live call"], demo: ["Detect", "Score a call"], policy: ["Detect", "Policy check"], review: ["Decide", "Review queue"], flags: ["Decide", "Today's flags"],
   recovery: ["Fix", "Customer recovery"], coaching: ["Fix", "Coaching"], agents: ["Fix", "Agents"], buddy: ["Prevent", "Live Sales Buddy"], results: ["Prove", "Accuracy"],
-  patterns: ["Prove", "Floor patterns"], roi: ["Prove", "P&L and ROI"] };
+  roi: ["Prove", "P&L and ROI"] };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(f, ms = 9000) { const t = Date.now(); while (Date.now() - t < ms) { const v = f(); if (v) return v; await wait(120); } return null; }
 
@@ -174,8 +174,8 @@ const TOUR = [
         await until(() => !BUDDY.busy); await typeInto($("#bd-in"), l); sendLine(); await wait(500); } } },
   { view: "results", title: "Prove: measure it live", body: "The deployed engine runs the 12 reworded stress calls right now. With a key set, this is the AI judge's real accuracy and speed, measured in front of you.", focus: ".lab",
     act: async () => { location.hash = "#results"; const b = await until(() => $("[data-run=stress]:not([disabled])")); b?.click(); } },
-  { view: "roi", title: "Prove: the rupees", body: "The brief's own numbers with our assumptions tagged. Drag any slider; the break-even line shows how little has to go right for this to pay.", focus: "#roi-hero",
-    act: async () => { location.hash = "#roi"; await until(() => $("#roi-sc")); for (const s of ["low", "high", "base"]) { $(`#roi-sc [data-s=${s}]`).click(); await wait(900); } } },
+  { view: "roi", title: "Prove: the rupees", body: "One answer: what CallCoach saves each month. Even the cautious case pays back, and every number underneath can be changed.", focus: "#roi-hero",
+    act: async () => { location.hash = "#roi"; await until(() => $(".roi-pick")); for (const s of ["low", "high", "base"]) { $(`.roi-pick [data-s=${s}]`).click(); await wait(900); } } },
   { view: "review", title: "Trust: try to cheat the trail", body: "First the chain verifies as intact. Then the tamper test quietly edits an old decision in storage, and verification points to the exact entry where the chain breaks. Press Undo tamper test afterwards.", focus: "#rv-body",
     act: async () => { rvTab = "trail"; location.hash = "#review"; if (rendered.review) renderReview(); await until(() => $("#tr-tamper"));
       if (Store.get("tamper")) { $("#tr-tamper").click(); await until(() => !Store.get("tamper")); await wait(300); }

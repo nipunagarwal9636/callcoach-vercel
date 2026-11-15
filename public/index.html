@@ -34,7 +34,6 @@
     <a href="#buddy" data-v="buddy">Live Sales Buddy</a>
     <div class="grp">Prove</div>
     <a href="#results" data-v="results">Accuracy</a>
-    <a href="#patterns" data-v="patterns">Floor patterns</a>
     <a href="#roi" data-v="roi">P&amp;L and ROI</a>
   </nav>
   <div class="status"><span class="led" id="led"></span><span id="status-text">Checking engine</span></div>
@@ -130,20 +129,6 @@
     <div id="lesson"></div>
   </section>
 
-  <!-- PATTERNS -->
-  <section class="view" id="v-patterns">
-    <div class="sec-head" style="margin-top:0"><div><h2>Floor patterns</h2><p>From 359 human audits and 12,020 calls. Repeated failures point to a cause above the agent: the team lead, the script, the month-end target.</p></div></div>
-    <div class="grid2">
-      <div class="panel"><h3>Where fatal errors leak out today</h3><p class="small muted" style="margin:4px 0 16px">Per month, audit sample scaled to the floor.</p><div class="funnel" id="funnel"></div></div>
-      <div class="panel"><h3>Month-end pressure</h3><p class="small muted" style="margin:4px 0 8px">Failure rate in the last 7 days of the month vs the rest.</p><div class="chartbox"><canvas id="ch-month"></canvas></div></div>
-    </div>
-    <div class="sec" style="margin-top:32px"><h3 style="margin-bottom:14px">What the patterns say</h3><div class="findings" id="findings"></div></div>
-    <div class="sec" style="margin-top:32px"><h3 style="margin-bottom:14px">Teams side by side</h3><div class="tablewrap"><table class="t" id="teams"></table></div></div>
-    <div class="grid2 sec" style="margin-top:32px">
-      <div class="panel"><h3>Auditors don't agree</h3><p class="small muted" style="margin:4px 0 8px">Share of audits marked fatal, by auditor. Same floor, three times the rate.</p><div class="chartbox"><canvas id="ch-aud"></canvas></div></div>
-      <div class="panel"><h3>By tenure</h3><p class="small muted" style="margin:4px 0 8px">Failure rates by months on the floor.</p><div class="tablewrap"><table class="t" id="tenure"></table></div></div>
-    </div>
-  </section>
 
   <!-- RESULTS -->
   <section class="view" id="v-results">

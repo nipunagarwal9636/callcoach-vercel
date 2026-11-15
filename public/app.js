@@ -315,14 +315,14 @@ function renderResults() {
 }
 
 /* ---------------- router + boot ---------------- */
-const RENDER = { overview: renderOverview, demo: () => {}, flags: renderFlags, coaching: () => {}, patterns: renderPatterns, results: renderResults };
+const RENDER = { overview: renderOverview, demo: () => {}, flags: renderFlags, coaching: () => {}, results: renderResults };
 const ALWAYS = new Set(["overview"]);
 const ONBOOT = [];
 const rendered = {};
 function route() {
   const v = (location.hash || "#overview").slice(1), view0 = RENDER[v] ? v : "overview";
   const view = window.roleGuard ? roleGuard(view0) : view0;
-  if (view !== view0) { history.replaceState(null, "", "#" + view); }
+  if (view !== v) { history.replaceState(null, "", "#" + view); }
   $$(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + view));
   $$("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.v === view));
   if (!rendered[view] || ALWAYS.has(view)) { RENDER[view](); rendered[view] = 1; }

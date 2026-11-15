@@ -1,9 +1,21 @@
 /* Customer recovery: fatal errors on calls that became sales get a callback with the correct facts, tracked to resolution. */
 const COLS = [["awaiting", "Awaiting review", "AI found a fatal error on a sale. A reviewer confirms before anyone calls the customer."],
-  ["tocall", "To call", "Confirmed. Call within 48 hours of the flag."], ["contacted", "Contacted", "Customer reached; record what they decided."],
+  ["tocall", "To call", "Confirmed. Assign the callback to an agent; call within 48 hours."], ["contacted", "Callback done", "The agent logged the outcome. The team lead checks it and closes the case."],
   ["resolved", "Resolved", ""]];
 const OUTCOMES = { retained: "Kept the policy, now fully informed", cancelled: "Cancelled in free-look, refund started", escalated: "Escalated to insurer or compliance", unreachable: "Unreachable after 3 attempts", noaction: "No action: reviewer overturned the finding" };
-const OWNERS = ["Retention desk", "Team lead", "Compliance"];
+const OWNERS = ["Retention desk", "Compliance"];
+/* Agents a callback can go to: the team of the call's team lead (a TL only sees their own team). */
+function teamAgents(call) {
+  const tl = window.role && role().role === "tl" ? Auth.user().team : call?.team_lead_id;
+  return (D.agents?.agents || []).filter((a) => !tl || a.team_lead_id === tl);
+}
+/* Snapshot of what an agent needs to make the callback, since agents can't open other agents' calls. */
+function caseSnap(id) {
+  const call = callOf(id); if (!call) return null;
+  const s = call.scored?.[D.modes[0]] || {}, doc = planFor(call);
+  return { agent: call.agent, agent_id: call.agent_id, product: call.product, premium: call.premium, plan: doc?.name || "", otp: !!s.conduct_alert,
+    ev: (cases()[id]?.fatal || s.fatal || []).map((p) => ({ p, quote: s.results?.[p]?.quote || "", turns: s.results?.[p]?.turns || [] })) };
+}
 const SLA_H = 48;
 
 function cases() { return Store.get("cases", {}); }
@@ -86,23 +98,64 @@ function renderRecovery() {
     const od = $$(".case.overdue", el); if (!od.length) return toast("No overdue callbacks. Every confirmed case is within 48 hours.");
     od[0].scrollIntoView({ behavior: "smooth", block: "center" }); od.forEach((x) => { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); });
   };
-  $$(".case select[data-owner]", el).forEach((s) => s.onchange = async () => {
-    const c = cases(); c[s.dataset.owner].owner = s.value; saveCases(c); await Trail.add("Recovery case assigned", s.dataset.owner, s.value);
-  });
+  $$(".case select[data-owner]", el).forEach((s) => s.onchange = () => assignCase(s.dataset.owner, s.value));
 }
 
 function caseCard(c) {
   const call = callOf(c.id); if (!call) return "";
-  const plan = planFor(call);
-  return `<div class="case ${isOverdue(c) ? "overdue" : ""}"><div class="case-h"><b>${c.id}</b>${sla(c)}</div>
+  const plan = planFor(call), rep = c.report, isTL = !window.role || ["tl", "admin"].includes(role().role);
+  const assign = `<select data-owner="${c.id}" aria-label="Assign the callback"><option value="">${c.assignee || c.owner ? "Reassign to…" : "Assign callback to…"}</option>
+      <optgroup label="Agents">${teamAgents(call).map((a) => `<option value="agent:${a.id}" ${c.assignee === a.id ? "selected" : ""}>${esc(a.name)} (${a.id})${a.id === call.agent_id ? ", sold this policy" : ""}</option>`).join("")}</optgroup>
+      <optgroup label="Teams">${OWNERS.map((o) => `<option value="team:${o}" ${!c.assignee && o === c.owner ? "selected" : ""}>${o}</option>`).join("")}</optgroup></select>`;
+  return `<div class="case ${isOverdue(c) ? "overdue" : ""} ${rep && !c.approved ? "pending" : ""}"><div class="case-h"><b>${c.id}</b>${sla(c)}</div>
     <div class="small">${esc(call.agent)}, ${plan ? esc(plan.name.replace(/ with zero depreciation/, "")) : String(call.product).toLowerCase()}${call.premium ? `, ${inr(call.premium)}` : ""}</div>
     <div class="routes" style="margin:6px 0">${c.fatal.map((p) => `<span class="chip FATAL">${p} ${esc(pname(p))}</span>`).join("")}</div>
     ${c.status === "awaiting" ? (window.role && role().role === "tl" ? `<span class="chip REVIEW">Waiting for a QA reviewer</span>` : `<button class="btn ghost small" data-act="review" data-id="${c.id}">Review the finding</button>`) : ""}
-    ${c.status === "tocall" ? `<select data-owner="${c.id}"><option value="">Assign to…</option>${OWNERS.map((o) => `<option ${o === c.owner ? "selected" : ""}>${o}</option>`).join("")}</select>
-      <div class="cta" style="margin-top:8px"><button class="btn small" data-act="script" data-id="${c.id}">Callback script</button><button class="btn ghost small" data-act="contacted" data-id="${c.id}">Mark contacted</button></div>` : ""}
-    ${c.status === "contacted" ? `<div class="cta" style="margin-top:4px"><button class="btn small" data-act="resolve" data-id="${c.id}">Record outcome</button><button class="btn ghost small" data-act="script" data-id="${c.id}">Script</button></div>` : ""}
-    ${c.status === "resolved" ? `<span class="chip ${c.outcome === "retained" || c.outcome === "noaction" ? "MET" : c.outcome === "cancelled" ? "MAJOR" : "NA"}">${esc(OUTCOMES[c.outcome] || c.outcome)}</span>` : ""}
-    ${c.owner && c.status !== "tocall" ? `<div class="small muted" style="margin-top:6px">Owner: ${esc(c.owner)}</div>` : ""}</div>`;
+    ${c.status === "tocall" ? `${c.assignee ? `<div class="assigned">${svg("agents", 14)} <span><b>${esc(c.assigneeName)}</b> is making this callback<span class="small muted">Assigned ${when(c.assigned)}${c.sentBack ? `. Sent back: ${esc(c.sentBack)}` : ""}</span></span></div>` : ""}
+      ${isTL ? assign : ""}
+      <div class="cta" style="margin-top:8px"><button class="btn ${c.assignee ? "ghost " : ""}small" data-act="script" data-id="${c.id}">Callback script</button>${c.assignee ? "" : `<button class="btn ghost small" data-act="contacted" data-id="${c.id}">Mark contacted</button>`}</div>` : ""}
+    ${c.status === "contacted" && rep ? `<div class="report"><div class="small muted">${esc(rep.byName)} logged the callback ${when(rep.ts)}</div>
+        <b>${esc(OUTCOMES[rep.outcome])}</b>${rep.note ? `<p class="small">“${esc(rep.note)}”</p>` : ""}${rep.scripted ? `<span class="small muted">Used the courtesy script</span>` : ""}</div>
+      ${isTL ? `<div class="cta" style="margin-top:8px"><button class="btn small" data-act="approve" data-id="${c.id}">Approve and close</button><button class="btn ghost small" data-act="sendback" data-id="${c.id}">Send back</button></div>` : `<span class="chip REVIEW">Waiting for the team lead's approval</span>`}` : ""}
+    ${c.status === "contacted" && !rep ? `<div class="cta" style="margin-top:4px"><button class="btn small" data-act="resolve" data-id="${c.id}">Record outcome</button><button class="btn ghost small" data-act="script" data-id="${c.id}">Script</button></div>` : ""}
+    ${c.status === "resolved" ? `<span class="chip ${c.outcome === "retained" || c.outcome === "noaction" ? "MET" : c.outcome === "cancelled" ? "MAJOR" : "NA"}">${esc(OUTCOMES[c.outcome] || c.outcome)}</span>${c.approved ? `<div class="small muted" style="margin-top:6px">Callback by ${esc(c.assigneeName || c.report?.byName || "")}, approved by ${esc(c.approved.by)}</div>` : ""}` : ""}
+    ${c.owner && !c.assignee && c.status !== "tocall" && c.status !== "resolved" ? `<div class="small muted" style="margin-top:6px">Owner: ${esc(c.owner)}</div>` : ""}</div>`;
+}
+
+async function assignCase(id, val) {
+  if (!val) return;
+  const c = cases(), cs = c[id], [kind, who] = val.split(/:(.*)/);
+  if (kind === "agent") {
+    const a = D.agents.agents.find((x) => x.id === who);
+    Object.assign(cs, { assignee: a.id, assigneeName: a.name, assigned: Date.now(), owner: a.name, snap: caseSnap(id), assignedBy: me().name });
+    if (!cs.confirmed) cs.confirmed = Date.now();
+    saveCases(c); await Trail.add("Callback assigned", id, `${a.name} (${a.id}) by ${me().name}`);
+    toast(`${a.name.split(" ")[0]} will see this callback on their dashboard`);
+  } else {
+    delete cs.assignee; delete cs.assigneeName; cs.owner = who; saveCases(c); await Trail.add("Recovery case assigned", id, who);
+  }
+  renderRecovery();
+}
+
+/* Agent logs the callback; the case waits for the team lead's approval. */
+function logCallback(id, after) {
+  const cs = cases()[id];
+  const body = drawer(`<h2>Log the callback for ${id}</h2><p class="small muted" style="margin:6px 0 14px">Your team lead checks this before the case is closed.</p>
+    ${Object.entries(OUTCOMES).filter(([k]) => k !== "noaction").map(([k, v]) => `<label class="radio"><input type="radio" name="oc" value="${k}"> ${v}</label>`).join("")}
+    <label class="fld">What the customer said<textarea id="oc-note" style="min-height:80px" placeholder="For example: understood the 3-year waiting period and is happy to keep the policy"></textarea></label>
+    <label class="toggle" style="margin-top:10px"><input type="checkbox" id="oc-script" checked> I used the courtesy call script and shared the key terms</label>
+    <div class="cta" style="margin-top:14px"><button class="btn" id="oc-save">Send to my team lead</button><button class="btn ghost" id="oc-sc">Open the script</button></div>`);
+  $("#oc-sc", body).onclick = () => showScript(id);
+  $("#oc-save", body).onclick = async () => {
+    const v = $("input[name=oc]:checked", body)?.value, note = $("#oc-note", body).value.trim();
+    if (!v) return toast("Pick what the customer decided");
+    if (note.length < 8) return toast("Add a short note on what the customer said");
+    const c = cases(); Object.assign(c[id], { status: "contacted", contacted: Date.now(), sentBack: "",
+      report: { outcome: v, note, scripted: $("#oc-script", body).checked, by: me().id, byName: me().name, ts: Date.now() } });
+    c[id].notes.push({ ts: Date.now(), by: me().name, text: `Callback logged: ${OUTCOMES[v]}. ${note}` }); saveCases(c);
+    await Trail.add("Callback logged by agent", id, `${OUTCOMES[v]}: ${note.slice(0, 120)}`);
+    closeDrawer(); toast("Sent to your team lead for approval"); after && after();
+  };
 }
 
 async function caseAction(id, act) {
@@ -110,6 +163,23 @@ async function caseAction(id, act) {
   if (act === "script") return showScript(id);
   if (!needMe()) return;
   const c = cases();
+  if (act === "approve") {
+    const cs = c[id]; Object.assign(cs, { status: "resolved", outcome: cs.report.outcome, closed: Date.now(), approved: { by: me().name, ts: Date.now() } });
+    cs.notes.push({ ts: Date.now(), by: me().name, text: "Approved the callback outcome" }); saveCases(c);
+    await Trail.add("Callback approved", id, `${OUTCOMES[cs.outcome]}, callback by ${cs.report.byName}`); toast("Approved. Case closed."); return renderRecovery();
+  }
+  if (act === "sendback") {
+    const body = drawer(`<h2>Send ${id} back to ${esc(c[id].report.byName)}</h2><p class="small muted" style="margin:6px 0 14px">Say what's missing. The callback goes back to their list.</p>
+      <label class="fld">Reason<textarea id="sb-why" style="min-height:80px" placeholder="For example: please confirm the customer understood the co-payment"></textarea></label>
+      <div class="cta" style="margin-top:14px"><button class="btn" id="sb-go">Send back</button></div>`);
+    $("#sb-go", body).onclick = async () => {
+      const why = $("#sb-why", body).value.trim(); if (!why) return toast("Add a reason");
+      const cc = cases(), cs = cc[id]; cs.notes.push({ ts: Date.now(), by: me().name, text: `Sent back: ${why}` });
+      Object.assign(cs, { status: "tocall", sentBack: why, report: null }); saveCases(cc);
+      await Trail.add("Callback sent back", id, why); closeDrawer(); renderRecovery();
+    };
+    return;
+  }
   if (act === "contacted") { c[id].status = "contacted"; c[id].contacted = Date.now(); saveCases(c); await Trail.add("Customer contacted", id, c[id].owner || "unassigned"); return renderRecovery(); }
   if (act === "resolve") {
     const body = drawer(`<h2>Record the outcome for ${id}</h2><p class="small muted" style="margin:6px 0 14px">What did the customer decide after hearing the correct terms?</p>
@@ -126,7 +196,7 @@ async function caseAction(id, act) {
 }
 
 function showScript(id) {
-  const c = cases()[id], call = callOf(id), doc = planFor(call), f = doc?.facts || {};
+  const c = cases()[id], call = callOf(id), doc = call ? planFor(call) : policyDocs().find((d) => d.name === c.snap?.plan), f = doc?.facts || {};
   const plan = doc ? doc.name : "your policy";
   const ped = f.ped_wait_months ? `${f.ped_wait_months / 12} years` : null;
   const fix = {
@@ -145,7 +215,8 @@ function showScript(id) {
     P2: ["This call is recorded for quality and training, which helps us serve you better."],
   };
   const lines = c.fatal.flatMap((p) => fix[p] || []).filter(Boolean);
-  const otp = callOf(id).scored?.[D.modes[0]]?.conduct_alert;
+  const otp = call ? call.scored?.[D.modes[0]]?.conduct_alert : c.snap?.otp;
+  const ev = call ? c.fatal.map((p) => ({ p, ...(call.scored?.[D.modes[0]]?.results?.[p] || {}) })) : c.snap?.ev || [];
   drawer(`<h2>Courtesy call script: ${id}</h2><p class="small muted" style="margin:6px 0 16px">Filled in from ${doc ? `the policy wording for <b>${esc(plan)}</b>` : "the scorecard (no matching policy in the library)"}. Keep it warm and in your own words. The aim is a well-informed, confident customer.</p>
     <ol class="script">
       <li><b>Greet and set the tone.</b> “Hello, this is [your name] from PolicyNest Insurance Brokers. Congratulations again on your ${esc(plan)} policy. This call is recorded for quality and training. Do you have five minutes?”</li>
@@ -162,9 +233,9 @@ function showScript(id) {
         <li>Never pressure them to keep or cancel the policy, and don't promise anything the wording doesn't say.</li>
         <li>If they ask to cancel, process it within the free-look period without argument.</li>
         ${otp ? `<li>An OTP or card detail was asked for on this call: log a conduct case with compliance today.</li>` : ""}
-        <li>Record what the customer decided under “Record outcome”.</li>
+        <li>${c.assignee ? "Log what the customer decided with “Log the callback”. Your team lead approves it before the case closes." : "Record what the customer decided under “Record outcome”."}</li>
       </ul>
-      <p class="small muted">What the AI found on the original call (evidence):</p>${c.fatal.map((p) => { const r = callOf(id).scored?.[D.modes[0]]?.results?.[p]; return r?.quote ? `<div class="said"><b>${p}</b> turn ${esc((r.turns || []).join(", "))}: <mark>${esc(r.quote)}</mark></div>` : ""; }).join("")}
+      <p class="small muted">What the AI found on the original call (evidence):</p>${ev.map((r) => r.quote ? `<div class="said"><b>${r.p}</b> turn ${esc((r.turns || []).join(", "))}: <mark>${esc(r.quote)}</mark></div>` : "").join("")}
     </details>`, true);
 }
 

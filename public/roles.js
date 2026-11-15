@@ -5,8 +5,8 @@ STAGE.home = ["", "Dashboard"];
 
 const ROLES = {
   admin: { label: "Admin", home: "Control room", nav: null },
-  tl: { label: "Team lead", home: "My team", nav: ["home", "live", "demo", "flags", "recovery", "coaching", "agents", "buddy", "patterns"] },
-  qa: { label: "QA auditor", home: "Review desk", nav: ["home", "live", "demo", "policy", "review", "flags", "results", "patterns"] },
+  tl: { label: "Team lead", home: "My team", nav: ["home", "live", "demo", "flags", "recovery", "coaching", "agents", "buddy"] },
+  qa: { label: "QA auditor", home: "Review desk", nav: ["home", "live", "demo", "policy", "review", "flags", "results"] },
   agent: { label: "Agent", home: "My dashboard", nav: ["home", "coaching", "buddy", "live"] },
 };
 function role() { const u = Auth.user() || { role: "admin" }; return { role: u.role, team: u.team, agent: u.agent, name: u.name, u: u.u }; }
@@ -77,8 +77,9 @@ ONBOOT.push(() => {
   applyRole();
   if (!location.hash || location.hash === "#overview" && role().role !== "admin") location.hash = "#home";
   setInterval(async () => {
-    const before = new Set(Feed.cache.map((i) => i.id + ":" + i.ts));
-    await Feed.refresh();
+    const before = new Set(Feed.cache.map((i) => i.id + ":" + i.ts)), cb0 = JSON.stringify(Store.get("cases", {}));
+    await Promise.all([Feed.refresh(), Sync.pull()]);
+    if (JSON.stringify(Store.get("cases", {})) !== cb0) { if (location.hash === "#home") RENDER.home(); if (location.hash === "#recovery") renderRecovery(); }
     const fresh = Feed.cache.filter((i) => !before.has(i.id + ":" + i.ts) && i.by !== role().name);
     if (fresh.length) { toast(`New scored call: ${fresh[0].id}, score ${fresh[0].s.score}`); updateBadges(); if (location.hash === "#home") RENDER.home(); }
   }, 15000);
