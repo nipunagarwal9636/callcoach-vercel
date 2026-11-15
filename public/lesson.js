@@ -19,6 +19,14 @@ function practise(p) {
   location.hash = "#buddy"; if (rendered.buddy) renderBuddy();
 }
 
+/* The module's main line is in the language of the agent's own call; return both versions by language. */
+function lessonLines(m) {
+  const hiCall = (m.excerpts?.[0]?.lang || "en") === "hi";
+  if (m.generated_by === "llm") { const other = m.better_other || ""; return hiCall ? { hi: m.better, en: other } : { en: m.better, hi: other }; }
+  if (m.better_en || m.better_hi) return { en: m.better_en || m.better, hi: m.better_hi || m.better };
+  return hiCall ? { hi: m.better, en: m.better_alt || m.better } : { en: m.better, hi: m.better_alt || m.better };
+}
+
 renderLesson = function (mod) {
   const v = D.coach[coScope]?.[$("#co-who").value]; if (!v) return;
   const key = `${$("#co-who").value}:${$("#co-param").value}`, saved = Store.get("aiLessons", {})[key];
@@ -26,7 +34,8 @@ renderLesson = function (mod) {
   const m = mod || (saved && !Store.get("aiLessonOff", {})[key] ? saved : base); if (!m) return;
   const ai = m.generated_by === "llm";
   const sc = D.scorecard.find((x) => x.id === m.param), R = LESSON_RULES[m.param], st = Memory.get().lessons?.[m.param] || {};
-  const lang = Store.get("lessonLang", "hi");
+  const lang = Store.get("lessonLang", "hi") === "en" ? "en" : "hi";
+  const L = lessonLines(m), line = L[lang];
   const ex = (m.excerpts || []).map((e) => `<div class="said"><span class="small muted">From your call ${e.call}</span>${e.lines.map(([n, sp, t]) => `<div class="${sp === "AGENT" ? "" : "c"}"><span class="small muted">${sp === "AGENT" ? "You" : "Customer"}:</span> ${sp === "AGENT" ? `<mark>${esc(t)}</mark>` : esc(t)}</div>`).join("")}</div>`).join("");
   $("#lesson").innerHTML = `<div class="lesson v2"><div class="lesson-head"><div class="lh-chips"><span class="chip ${sc.severity === "FATAL" ? "FATAL" : sc.severity}">${m.param} ${sc.severity === "FATAL" ? "fatal" : sc.severity.toLowerCase()}</span>
       ${st.passed ? `<span class="chip MET">Practice passed</span>` : st.tries ? `<span class="chip MAJOR">Practised ${st.tries}×</span>` : `<span class="chip NA">Not practised yet</span>`}
@@ -42,11 +51,9 @@ renderLesson = function (mod) {
       <div class="lcard do"><h3>Do this</h3><ul>${R.do.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
       <div class="lcard dont"><h3>Never this</h3><ul>${R.dont.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
       <div class="lcard wide"><h3>${coScope === "agents" ? "What happened on your call" : "What the team said"}</h3>${ex || `<p class="muted small">No excerpt.</p>`}</div>
-      ${ai ? `<div class="lcard wide say-it"><div class="lc-h"><h3>Say this instead, written for your calls</h3></div>
-        <div class="better big">${esc(m.better)}</div>${m.better_other ? `<div class="better" style="margin-top:8px">${esc(m.better_other)}</div>` : ""}<button class="linkbtn" id="ls-copy">Copy line</button>
-        <details class="small" style="margin-top:8px"><summary>Standard script line</summary><div class="better" style="margin-top:6px">${esc(lang === "hi" ? base.better : base.better_alt || base.better)}</div></details></div>`
-      : `<div class="lcard wide say-it"><div class="lc-h"><h3>Say this instead</h3><div class="seg small-seg"><button data-l="hi" class="${lang === "hi" ? "on" : ""}">Hinglish</button><button data-l="en" class="${lang === "en" ? "on" : ""}">English</button></div></div>
-        <div class="better big">${esc(lang === "hi" ? m.better : m.better_alt || m.better)}</div><button class="linkbtn" id="ls-copy">Copy line</button></div>`}
+      <div class="lcard wide say-it"><div class="lc-h"><h3>${ai ? "Say this instead, written for your calls" : "Say this instead"}</h3><div class="seg small-seg"><button data-l="hi" class="${lang === "hi" ? "on" : ""}">Hinglish</button><button data-l="en" class="${lang === "en" ? "on" : ""}">English</button></div></div>
+        <div class="better big">${esc(line || L[lang === "hi" ? "en" : "hi"])}</div><button class="linkbtn" id="ls-copy">Copy line</button>
+        ${ai ? `<details class="small" style="margin-top:8px"><summary>Standard script line</summary><div class="better" style="margin-top:6px">${esc(lessonLines(base)[lang])}</div></details>` : ""}</div>
       <div class="lcard drill"><h3>Test it with the Live Sales Buddy</h3><p>${esc(m.practice || R.test)}</p><button class="btn small" id="ls-drill">${svg("buddy", 15)} Start the drill</button></div>
       <div class="lcard"><h3>How you'll know it worked</h3><p>${esc(m.measure)}</p>${m.root_cause ? `<div class="cause"><b>Likely root cause.</b> ${esc(m.root_cause)}</div>` : ""}</div>
     </div>
@@ -57,7 +64,7 @@ renderLesson = function (mod) {
   const toggleAI = (off) => { const o = Store.get("aiLessonOff", {}); o[key] = off; Store.set("aiLessonOff", o); renderLesson(); };
   $("#ls-std")?.addEventListener("click", () => toggleAI(true));
   $("#ls-mine")?.addEventListener("click", () => toggleAI(false));
-  $("#ls-copy").onclick = () => { navigator.clipboard?.writeText(ai ? m.better : lang === "hi" ? m.better : m.better_alt || m.better)?.catch(() => {}); toast("Copied"); };
+  $("#ls-copy").onclick = () => { navigator.clipboard?.writeText(line || m.better)?.catch(() => {}); toast("Copied"); };
   $$("[data-l]", $("#lesson")).forEach((b) => b.onclick = () => { Store.set("lessonLang", b.dataset.l); renderLesson(mod); });
   const ab = $("#co-ai"); if (ab && !ab.disabled) ab.textContent = saved ? "Personalise again with AI" : "Personalise with AI";
   Memory.lesson(m.param, { viewed: Date.now() });

@@ -118,6 +118,7 @@ def build_module(who, calls, scored, param=None, scope="agent", n_scored=None, u
         rule=f"{param} {d['name']} ({'fatal: the call scores 0' if d['points'] is None else str(d['points']) + ' points, ' + d['severity'].lower()}). MET: {d['met']}",
         excerpts=ex,
         better=BETTER[param][1 if lang == "hi" else 0], better_alt=BETTER[param][0 if lang == "hi" else 1],
+        better_en=BETTER[param][0], better_hi=BETTER[param][1],
         practice=PRACTICE[param],
         measure=f"Today: {param} failed on {k} of {n} scored calls ({k / n:.0%}). Target: 0 failures in the next 20 scored calls, checked automatically; review in 7 days.",
         root_cause=None, generated_by="template", guardrail=[],
