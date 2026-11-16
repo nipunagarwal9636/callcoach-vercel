@@ -5,7 +5,7 @@ from .transcript import Call, Turn
 
 HINGLISH_PROMPT = ("Haan ji, main PolicyNest Insurance Brokers se baat kar raha hoon. Aapko health insurance chahiye? "
                    "Premium, waiting period, cashless, claim, OTP. Theek hai, main wife se baat karke batata hoon.")
-HALLUCINATIONS = {"thank you.", "thank you", "thanks for watching.", "thanks for watching!", "you", ".", "bye.", "subtitles by the amara.org community"}
+HALLUCINATIONS = {"thank you.", "thank you", "thanks for watching.", "thanks for watching!", "thank you for watching.", "thank you for watching!", "please subscribe.", "like and subscribe.", "you", ".", "bye.", "bye", "subtitles by the amara.org community", "music", "[music]", "(music)", "♪"}
 
 
 def transcribe(file_bytes, filename, speaker=None):

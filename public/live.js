@@ -1,10 +1,13 @@
 /* Live call monitor: listen to a real conversation, transcribe it as it happens, and flag fatal errors with the fix on screen. */
-const LIVE = { setup: "room", seq: 0, voice: null, on: false, engine: "browser", lang: "en-IN", mode: "turns", speaker: "AGENT", lastEnd: 0, plan: "insurer-b-health-secure-plus",
+const LIVE = { setup: "room", seq: 0, voice: null, on: false, engine: null, dev: "", lang: "en-IN", mode: "turns", speaker: "AGENT", lastEnd: 0, plan: "insurer-b-health-secure-plus",
   turns: [], interim: "", coach: null, log: [], seen: new Set(), rec: null, mr: null, sound: true, playing: false, t0: 0, busy: 0, ms: [] };
 const SR_ = window.SpeechRecognition || window.webkitSpeechRecognition;
+try { LIVE.dev = localStorage.getItem("cc:live-dev") || ""; LIVE.engine = localStorage.getItem("cc:live-engine"); } catch {}
+const micConstraints = (raw) => ({ audio: { ...(LIVE.dev ? { deviceId: { exact: LIVE.dev } } : {}), echoCancellation: false, noiseSuppression: false, autoGainControl: !raw, channelCount: 1 } });
 
 function renderLive() {
   const el = $("#v-live");
+  if (!LIVE.engine || (LIVE.engine === "whisper" && !STATUS.stt) || (LIVE.engine === "browser" && !SR_)) LIVE.engine = STATUS.stt ? "whisper" : "browser";
   const plans = policyDocs();
   el.innerHTML = `<div class="sec-head" style="margin-top:0"><div><h2>Live call</h2><p>Put a real conversation on speaker next to the laptop, or have two people talk in the room. CallCoach transcribes it as it happens, and the moment the agent says something fatal it turns red and shows the line that fixes it, while the customer is still on the call.</p></div></div>
   <div class="panel live-ctl">
@@ -15,14 +18,16 @@ function renderLive() {
       <button class="btn ghost small" id="lv-clear" ${LIVE.turns.length ? "" : "disabled"}>Clear</button>
       <span class="lc-time" id="lv-time"></span>
     </div>
+    ${LIVE.on && LIVE.setup === "room" ? `<div class="lv-level"><span class="small muted">Mic level</span><span class="vu wide"><i id="lv-vu2"></i></span><span class="small" id="lv-hear">Listening…</span></div>` : ""}
     <div class="setup">${[["room", "Phone on speaker, or both people in the room", "One laptop microphone hears both voices. Easiest for a stage demo."],
       ["laptop", "Call on this laptop", "Google Meet, WhatsApp Web or Zoom in a browser tab. The agent's voice comes from the mic, the customer's from the call tab, so who said what is exact."]]
       .map(([k, n, d]) => `<button class="setup-o ${LIVE.setup === k ? "on" : ""}" data-setup="${k}"><b>${n}</b><span>${d}</span></button>`).join("")}
       <button class="linkbtn" id="lv-howto">How to set up the phone call</button></div>
     <div class="lc-row opts">
       <label ${LIVE.setup === "laptop" ? "hidden" : ""}>Listen with<select id="lv-engine">
-        <option value="browser" ${LIVE.engine === "browser" ? "selected" : ""} ${SR_ ? "" : "disabled"}>Browser speech (Chrome or Edge)${SR_ ? "" : " – not available here"}</option>
-        <option value="whisper" ${LIVE.engine === "whisper" ? "selected" : ""} ${STATUS.stt ? "" : "disabled"}>Whisper AI, 6-second chunks${STATUS.stt ? "" : " – needs STT key"}</option></select></label>
+        <option value="whisper" ${LIVE.engine === "whisper" ? "selected" : ""} ${STATUS.stt ? "" : "disabled"}>Whisper AI: best for a phone on speaker${STATUS.stt ? "" : " (needs the Groq key)"}</option>
+        <option value="browser" ${LIVE.engine === "browser" ? "selected" : ""} ${SR_ ? "" : "disabled"}>Browser speech: instant, close voices only${SR_ ? "" : " (Chrome or Edge only)"}</option></select></label>
+      <label ${LIVE.setup === "laptop" ? "hidden" : ""}>Microphone<select id="lv-dev"><option value="">Default microphone</option>${(LIVE.devs || []).map((d) => `<option value="${d.deviceId}" ${d.deviceId === LIVE.dev ? "selected" : ""}>${esc(d.label || "Microphone")}</option>`).join("")}</select></label>
       <label>Language<select id="lv-lang"><option value="en-IN">English + Hinglish (en-IN)</option><option value="hi-IN" ${LIVE.lang === "hi-IN" ? "selected" : ""}>Hindi (hi-IN)</option></select></label>
       <label ${LIVE.setup === "laptop" ? "hidden" : ""}>Who's speaking<select id="lv-mode"><option value="turns">Automatic (recommended)</option><option value="voice" ${LIVE.mode === "voice" ? "selected" : ""}>Automatic by voice (calibrate once)</option><option value="auto" ${LIVE.mode === "auto" ? "selected" : ""}>Automatic from the words${STATUS.llm ? " (AI)" : ""}</option><option value="manual" ${LIVE.mode === "manual" ? "selected" : ""}>I switch it (Space bar)</option></select></label>
       ${LIVE.setup === "room" && (LIVE.mode === "voice" || LIVE.mode === "turns") ? `<button class="btn ghost small" id="lv-cal">${LIVE.voice ? "Recalibrate voices" : "Calibrate voices"}</button>` : ""}
@@ -40,7 +45,9 @@ function renderLive() {
   $("#lv-sample").onclick = () => (LIVE.playing ? (LIVE.playing = false) : playSample());
   $("#lv-end").onclick = endLive;
   $("#lv-clear").onclick = () => { if (LIVE.on) stopListening(); Object.assign(LIVE, { turns: [], log: [], seen: new Set(), coach: null, interim: "", ms: [], shared: false }); renderLive(); };
-  $("#lv-engine").onchange = (e) => (LIVE.engine = e.target.value);
+  $("#lv-engine").onchange = (e) => { if (LIVE.on) stopListening(); LIVE.engine = e.target.value; try { localStorage.setItem("cc:live-engine", LIVE.engine); } catch {} renderLive(); };
+  $("#lv-dev").onchange = (e) => { if (LIVE.on) stopListening(); LIVE.dev = e.target.value; try { localStorage.setItem("cc:live-dev", LIVE.dev); } catch {} if (LIVE.engine === "browser" && LIVE.dev) toast("Browser speech always uses the system's default microphone. Pick Whisper to use this one."); };
+  if (!LIVE.devs) listMics();
   $("#lv-lang").onchange = (e) => (LIVE.lang = e.target.value);
   $("#lv-mode").onchange = (e) => { LIVE.mode = e.target.value; renderLive(); if (LIVE.mode === "voice" && !LIVE.voice) calibrate(); };
   $$("[data-setup]").forEach((b) => b.onclick = () => { if (LIVE.on) stopListening(); LIVE.setup = b.dataset.setup; renderLive(); });
@@ -175,10 +182,16 @@ function flash(level) {
 
 /* ---------- voice meter: tells the agent's voice (near the laptop) from the customer's (through a phone speaker) ---------- */
 const VM = { ac: null, an: null, frames: [], timer: null, stream: null };
-async function meterStart() {
+async function listMics() {
+  try { const ds = await navigator.mediaDevices.enumerateDevices(); LIVE.devs = ds.filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications");
+    if (LIVE.devs.length && !LIVE.devs.some((d) => d.label)) LIVE.devs = [];
+    const sel = $("#lv-dev"); if (sel && LIVE.devs.length && sel.options.length === 1) renderLive(); } catch { LIVE.devs = []; }
+}
+async function meterStart(quiet) {
   if (VM.timer) return true;
-  try { VM.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
-  catch { toast("Microphone blocked. Allow it in the address bar."); return false; }
+  try { VM.stream = await navigator.mediaDevices.getUserMedia(micConstraints(true)); }
+  catch { if (!quiet) toast("Microphone blocked. Allow it in the address bar."); return false; }
+  if (!LIVE.devs || !LIVE.devs.length) listMics();
   VM.ac = new (window.AudioContext || window.webkitAudioContext)();
   const src = VM.ac.createMediaStreamSource(VM.stream); VM.an = VM.ac.createAnalyser(); VM.an.fftSize = 2048; src.connect(VM.an);
   const td = new Float32Array(VM.an.fftSize), fd = new Float32Array(VM.an.frequencyBinCount), hz = VM.ac.sampleRate / VM.an.fftSize;
@@ -189,7 +202,8 @@ async function meterStart() {
     for (let k = 0; k < fd.length; k++) { const f = k * hz, p = Math.pow(10, fd[k] / 10); if (f >= 300 && f <= 3400) lo += p; else if (f >= 3800 && f <= 7500) hi += p; }
     VM.frames.push({ t: Date.now(), db, hf: 10 * Math.log10(hi / lo) });
     if (VM.frames.length > 1600) VM.frames.splice(0, 400);
-    const vu = $("#lv-vu"); if (vu) vu.style.width = Math.max(0, Math.min(100, (db + 70) * 1.6)) + "%";
+    const w = Math.max(0, Math.min(100, (db + 70) * 1.6)) + "%";
+    const vu = $("#lv-vu"); if (vu) vu.style.width = w; const vu2 = $("#lv-vu2"); if (vu2) vu2.style.width = w;
   }, 50);
   return true;
 }
@@ -238,6 +252,7 @@ function speechRec(onFinal) {
   const r = new SR_(); r.lang = LIVE.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
   let segStart = Date.now();
   r.onresult = (e) => {
+    LIVE.lastResult = Date.now();
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i];
@@ -246,7 +261,7 @@ function speechRec(onFinal) {
     LIVE.interim = interim; drawTx();
   };
   r.onerror = (e) => { if (e.error === "not-allowed") { toast("Microphone blocked. Allow it in the address bar and try again."); stopListening(); } else if (!["no-speech", "aborted", "network"].includes(e.error)) toast("Speech: " + e.error); };
-  r.onend = () => { if (LIVE.on && LIVE.rec === r) { try { r.start(); } catch { /* restarting */ } } };
+  r.onend = () => { if (LIVE.on && LIVE.rec === r) setTimeout(() => { if (LIVE.on && LIVE.rec === r) { try { r.start(); } catch { /* restarting */ } } }, 120); };
   return r;
 }
 
@@ -255,8 +270,8 @@ async function startListening() {
   if (!LIVE.t0 || !LIVE.turns.length) LIVE.t0 = Date.now();
   if (LIVE.setup === "laptop") return startLaptopCall();
   if (LIVE.mode === "voice") { if (!LIVE.voice) return calibrate(); if (!(await meterStart())) return; }
-  if (LIVE.mode === "turns" && LIVE.voice && !(await meterStart())) return;
-  LIVE.lastEnd = 0;
+  if (!(await meterStart(LIVE.engine === "browser")) && LIVE.engine === "whisper") return;      // level meter, mic check and voice features
+  LIVE.lastEnd = 0; LIVE.lastResult = Date.now(); LIVE.quietSince = Date.now();
   if (LIVE.engine === "browser") {
     if (!SR_) return toast("Use Chrome or Edge for live listening, or pick Whisper");
     LIVE.rec = speechRec((text, from, to) => {
@@ -268,12 +283,10 @@ async function startListening() {
     });
     try { LIVE.rec.start(); } catch (e) { return toast(e.message); }
   } else {
-    let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("Microphone blocked. Allow it in the address bar."); }
-    LIVE.stream = stream; whisperLoop(stream, null);
+    if (!(await roomStart())) return;
   }
-  LIVE.on = true; LIVE.tick = setInterval(() => { const t = $("#lv-time"); if (t) t.textContent = clock(); }, 1000);
-  renderLive(); toast("Listening. Speak normally; lines appear as each sentence ends.");
+  LIVE.on = true; LIVE.tick = setInterval(liveTick, 1000);
+  renderLive(); toast(LIVE.engine === "whisper" ? "Listening. Each sentence is sent to Whisper when the speaker pauses." : "Listening. Speak normally; lines appear as each sentence ends.");
 }
 
 async function startLaptopCall() {
@@ -292,6 +305,97 @@ async function startLaptopCall() {
   try { LIVE.rec.start(); } catch (e) { toast(e.message); }
   LIVE.on = true; LIVE.tick = setInterval(() => { const t = $("#lv-time"); if (t) t.textContent = clock(); }, 1000);
   renderLive(); toast("Listening to your mic (agent) and the call tab (customer). Use headphones.");
+}
+
+/* Clock, mic check and a watchdog that restarts browser speech if it silently stalls. */
+function liveTick() {
+  const t = $("#lv-time"); if (t) t.textContent = clock();
+  const f = VM.frames[VM.frames.length - 1], hear = $("#lv-hear");
+  if (f && f.db > -55) LIVE.quietSince = Date.now();
+  if (hear && !ROOM.speaking) hear.textContent = Date.now() - (LIVE.quietSince || Date.now()) > 6000 ? "Very quiet: turn the phone volume up or bring it closer" : "Listening…";
+  if (LIVE.engine === "browser" && LIVE.rec && LIVE.setup === "room" && Date.now() - (LIVE.lastResult || 0) > 9000 && f && f.db > -50) {
+    LIVE.lastResult = Date.now(); try { LIVE.rec.abort(); } catch {}   // onend restarts it
+  }
+}
+
+/* ---- Whisper in the room: cut the audio at natural pauses (voice activity), boost quiet speakers, send each sentence as WAV. ---- */
+const ROOM = { ac: null, stream: null, proc: null, pre: [], buf: [], speaking: false, silence: 0, voiced: 0, floor: -60, start: 0, queue: Promise.resolve() };
+async function roomStart() {
+  try { ROOM.stream = await navigator.mediaDevices.getUserMedia(micConstraints(false)); }
+  catch { toast("Microphone blocked. Allow it in the address bar."); return false; }
+  const ac = ROOM.ac = new (window.AudioContext || window.webkitAudioContext)();
+  const src = ac.createMediaStreamSource(ROOM.stream);
+  const hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 90;          // drop rumble and table knocks
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -40; comp.knee.value = 20; comp.ratio.value = 6; comp.attack.value = 0.005; comp.release.value = 0.2;
+  const gain = ac.createGain(); gain.gain.value = 2.2;                                            // lift the phone speaker's quieter voice
+  const proc = ROOM.proc = ac.createScriptProcessor(4096, 1, 1);
+  src.connect(hp); hp.connect(comp); comp.connect(gain); gain.connect(proc); proc.connect(ac.destination);
+  const frameMs = 4096 / ac.sampleRate * 1000;
+  Object.assign(ROOM, { pre: [], buf: [], speaking: false, silence: 0, voiced: 0, floor: null });
+  proc.onaudioprocess = (e) => {
+    const x = new Float32Array(e.inputBuffer.getChannelData(0)); e.outputBuffer.getChannelData(0).fill(0);
+    let sq = 0; for (let i = 0; i < x.length; i++) sq += x[i] * x[i];
+    const db = 10 * Math.log10(sq / x.length + 1e-12);
+    if (ROOM.floor === null) ROOM.floor = db;
+    ROOM.floor = db < ROOM.floor ? ROOM.floor * 0.7 + db * 0.3 : ROOM.floor + (db - ROOM.floor) * 0.004;   // background noise: falls fast, rises slowly
+    const speech = db > Math.max(ROOM.floor + 8, -62);
+    if (!ROOM.speaking) {
+      ROOM.pre.push(x); if (ROOM.pre.length > Math.ceil(450 / frameMs)) ROOM.pre.shift();
+      if (speech) { ROOM.speaking = true; ROOM.start = Date.now() - ROOM.pre.length * frameMs; ROOM.buf = ROOM.pre.slice(); ROOM.pre = []; ROOM.silence = 0; ROOM.voiced = frameMs;
+        const h = $("#lv-hear"); if (h) h.textContent = "Hearing speech…"; }
+      return;
+    }
+    ROOM.buf.push(x);
+    if (speech) { ROOM.silence = 0; ROOM.voiced += frameMs; } else ROOM.silence += frameMs;
+    const dur = ROOM.buf.length * frameMs;
+    if (ROOM.silence >= 750 || dur >= 14000) {
+      const chunk = ROOM.buf, from = ROOM.start, voiced = ROOM.voiced, rate = ac.sampleRate;
+      ROOM.speaking = false; ROOM.buf = []; ROOM.pre = [];
+      const h = $("#lv-hear"); if (h) h.textContent = "Listening…";
+      if (voiced >= 450) sendUtterance(chunk, rate, from, Date.now() - ROOM.silence);
+    }
+  };
+  return true;
+}
+function roomStop() {
+  if (ROOM.speaking && ROOM.buf.length && ROOM.ac) sendUtterance(ROOM.buf, ROOM.ac.sampleRate, ROOM.start, Date.now());
+  ROOM.speaking = false; ROOM.buf = [];
+  try { ROOM.proc && (ROOM.proc.onaudioprocess = null); ROOM.proc?.disconnect(); } catch {}
+  ROOM.stream?.getTracks().forEach((t) => t.stop()); ROOM.stream = null;
+  try { ROOM.ac?.close(); } catch {} ROOM.ac = null;
+}
+function encodeWav(chunks, rate) {
+  const target = 16000, ratio = rate / target, total = chunks.reduce((n, c) => n + c.length, 0), out = new Int16Array(Math.floor(total / ratio));
+  const flat = new Float32Array(total); let o = 0; for (const c of chunks) { flat.set(c, o); o += c.length; }
+  let peak = 0; for (let i = 0; i < flat.length; i++) peak = Math.max(peak, Math.abs(flat[i]));
+  const norm = peak > 0.01 ? Math.min(4, 0.9 / peak) : 1;                                       // normalise loudness per sentence
+  for (let i = 0; i < out.length; i++) { let a = 0, n = 0; const s0 = Math.floor(i * ratio), s1 = Math.min(total, Math.floor((i + 1) * ratio)); for (let k = s0; k < s1; k++) { a += flat[k]; n++; }
+    out[i] = Math.max(-1, Math.min(1, (n ? a / n : 0) * norm)) * 0x7fff; }
+  const b = new ArrayBuffer(44 + out.length * 2), v = new DataView(b), w = (p, s) => [...s].forEach((ch, i) => v.setUint8(p + i, ch.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + out.length * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, target, true); v.setUint32(28, target * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, out.length * 2, true);
+  new Int16Array(b, 44).set(out); return new Blob([b], { type: "audio/wav" });
+}
+function sendUtterance(chunks, rate, from, to) {
+  const blob = encodeWav(chunks, rate);
+  LIVE.pending = (LIVE.pending || 0) + 1; LIVE.interim = "Transcribing…"; drawTx();
+  ROOM.queue = ROOM.queue.then(async () => {            // one at a time keeps lines in order and stays under rate limits
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch("/api/transcribe", { method: "POST", headers: { "X-Filename": "utterance.wav", "Content-Type": "audio/wav", "X-Speaker": "AGENT" }, body: blob });
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 429 || /rate limit/i.test(j.error || "")) { await wait(2500 * (attempt + 1)); continue; }
+        if (!r.ok) throw new Error(j.error || r.status);
+        const text = (j.turns || []).map((t) => t.t).join(" ").trim();
+        if (text) {
+          const v = (LIVE.mode === "voice" || LIVE.mode === "turns") ? whoByVoice(from, to) : null;
+          await addSegment(text, LIVE.mode === "manual" ? LIVE.speaker : v && v.sure ? v.s : null, from, v && v.sure ? "voice" : "whisper");
+        }
+        break;
+      } catch (e) { toast("Whisper: " + e.message); break; }
+    }
+    LIVE.pending--; if (!LIVE.pending) { LIVE.interim = ""; drawTx(); }
+  });
 }
 
 function whisperLoop(stream, speaker, ms = 6000) {
@@ -320,7 +424,7 @@ function stopListening() {
   (LIVE.mrs || []).forEach((m) => { try { m.state === "recording" && m.stop(); } catch { } }); LIVE.mrs = [];
   LIVE.stream?.getTracks().forEach((t) => t.stop()); LIVE.stream = null;
   LIVE.tab?.getTracks().forEach((t) => t.stop()); LIVE.tab = null;
-  meterStop();
+  roomStop(); meterStop();
   LIVE.interim = ""; document.body.classList.remove("live-fatal"); renderLive();
   if (role().role === "agent" && LIVE.turns.filter((t) => t.s === "AGENT").length >= 2 && !LIVE.shared) { toast("Scoring your call and sending it to your team lead"); endLive(); }
 }
