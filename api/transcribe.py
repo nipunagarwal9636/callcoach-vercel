@@ -11,6 +11,9 @@ from qa.stt import transcribe
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):  # warm-up ping so the first live sentence isn't slowed by a cold start
+        send(self, 200, {"ok": True})
+
     def do_POST(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)

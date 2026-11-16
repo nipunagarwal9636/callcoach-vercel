@@ -80,7 +80,7 @@ function drawTx() {
           ${LIVE.log.filter((l) => l.tid === t.id).map((l) => suggHTML(l)).join("")}</div><span class="small muted">${t.at}${t.how ? `<br><span class="how">${t.how}</span>` : ""}</span></div>`; }).join("")
     + (LIVE.interim ? `<div class="lv-line interim ${LIVE.speaker === "AGENT" ? "ag" : "cu"}"><span class="who">${LIVE.mode === "manual" ? (LIVE.speaker === "AGENT" ? "Agent" : "Customer") : "…"}</span><div><p>${esc(LIVE.interim)}</p></div></div>` : "");
   wireSugg(box);
-  $$("[data-flip]", box).forEach((b) => b.onclick = () => { const t = LIVE.turns[+b.dataset.flip]; t.s = t.s === "AGENT" ? "CUSTOMER" : "AGENT"; drawTx(); analyse(); });
+  $$("[data-flip]", box).forEach((b) => b.onclick = () => { const t = LIVE.turns[+b.dataset.flip]; t.s = t.s === "AGENT" ? "CUSTOMER" : "AGENT"; t.fixed = true; t.how = "you"; drawTx(); analyse(); });
   box.scrollTop = box.scrollHeight;
 }
 
@@ -132,10 +132,13 @@ async function addSegment(text, speaker, ts, how) {
   drawTx();
   if (!speaker && LIVE.mode !== "manual") {
     if (!STATUS.api) { turn.s = guessLocal(text, LIVE.turns.slice(0, i)); turn.how = "turn"; drawTx(); return analyse(); }
-    try {
-      const r = await fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, context: LIVE.turns.slice(0, i).map(({ s, t }) => ({ s, t })), use_llm: true }) });
-      const j = await r.json(); if (r.ok) { turn.s = j.speaker; turn.how = j.source === "ai" ? "AI" : "auto"; }
-    } catch { /* keep the current speaker */ }
+    const ctx = LIVE.turns.slice(0, i).map(({ s, t }) => ({ s, t }));
+    const label = (ai) => fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, context: ctx, use_llm: ai }) }).then((r) => r.ok ? r.json() : null).catch(() => null);
+    const fast = await label(false);                       // rules: a few milliseconds, so alerts aren't held up
+    if (fast) { turn.s = fast.speaker; turn.how = "auto"; }
+    if (STATUS.llm) label(true).then((j) => {               // AI double-checks in the background
+      if (j && j.speaker && j.speaker !== turn.s && !turn.fixed) { turn.s = j.speaker; turn.how = "AI"; drawTx(); analyse(); }
+    });
     LIVE.speaker = turn.s; const nw = $("#lv-now"); if (nw) { nw.textContent = turn.s === "AGENT" ? "Agent" : "Customer"; nw.className = "nowspk " + (turn.s === "AGENT" ? "ag" : "cu"); }
     drawTx();
   }
@@ -248,8 +251,15 @@ async function calibrate() {
 }
 
 /* ---------- listening ---------- */
-function speechRec(onFinal) {
+function speechRec(onFinal, captionOnly) {
   const r = new SR_(); r.lang = LIVE.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+  if (captionOnly) {
+    r.onresult = (e) => { let t = ""; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; LIVE.caption = t.trim(); LIVE.interim = LIVE.caption ? LIVE.caption + " …" : (LIVE.pending ? "Transcribing…" : ""); drawTx();
+      clearTimeout(LIVE.capT); LIVE.capT = setTimeout(() => { LIVE.caption = ""; if (!LIVE.pending) { LIVE.interim = ""; drawTx(); } }, 2500); };
+    r.onerror = () => {};
+    r.onend = () => { if (LIVE.on && LIVE.cap === r) setTimeout(() => { try { LIVE.on && LIVE.cap === r && r.start(); } catch {} }, 150); };
+    return r;
+  }
   let segStart = Date.now();
   r.onresult = (e) => {
     LIVE.lastResult = Date.now();
@@ -284,6 +294,11 @@ async function startListening() {
     try { LIVE.rec.start(); } catch (e) { return toast(e.message); }
   } else {
     if (!(await roomStart())) return;
+    fetch("/api/transcribe").catch(() => {});      // wake the server so the first sentence isn't slow
+    if (SR_) {                                     // instant draft captions; Whisper writes the final line
+      LIVE.cap = speechRec(() => {}, true);
+      try { LIVE.cap.start(); } catch {}
+    }
   }
   LIVE.on = true; LIVE.tick = setInterval(liveTick, 1000);
   renderLive(); toast(LIVE.engine === "whisper" ? "Listening. Each sentence is sent to Whisper when the speaker pauses." : "Listening. Speak normally; lines appear as each sentence ends.");
@@ -348,7 +363,7 @@ async function roomStart() {
     ROOM.buf.push(x);
     if (speech) { ROOM.silence = 0; ROOM.voiced += frameMs; } else ROOM.silence += frameMs;
     const dur = ROOM.buf.length * frameMs;
-    if (ROOM.silence >= 750 || dur >= 14000) {
+    if (ROOM.silence >= 600 || dur >= 8000) {
       const chunk = ROOM.buf, from = ROOM.start, voiced = ROOM.voiced, rate = ac.sampleRate;
       ROOM.speaking = false; ROOM.buf = []; ROOM.pre = [];
       const h = $("#lv-hear"); if (h) h.textContent = "Listening…";
@@ -379,7 +394,7 @@ function encodeWav(chunks, rate) {
 function sendUtterance(chunks, rate, from, to) {
   const blob = encodeWav(chunks, rate);
   LIVE.pending = (LIVE.pending || 0) + 1; LIVE.interim = "Transcribing…"; drawTx();
-  ROOM.queue = ROOM.queue.then(async () => {            // one at a time keeps lines in order and stays under rate limits
+  (async () => {            // sent straight away; lines are placed by the time they were spoken, so order is kept
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const r = await fetch("/api/transcribe", { method: "POST", headers: { "X-Filename": "utterance.wav", "Content-Type": "audio/wav", "X-Speaker": "AGENT" }, body: blob });
@@ -388,14 +403,15 @@ function sendUtterance(chunks, rate, from, to) {
         if (!r.ok) throw new Error(j.error || r.status);
         const text = (j.turns || []).map((t) => t.t).join(" ").trim();
         if (text) {
+          LIVE.caption = ""; clearTimeout(LIVE.capT);
           const v = (LIVE.mode === "voice" || LIVE.mode === "turns") ? whoByVoice(from, to) : null;
           await addSegment(text, LIVE.mode === "manual" ? LIVE.speaker : v && v.sure ? v.s : null, from, v && v.sure ? "voice" : "whisper");
         }
         break;
       } catch (e) { toast("Whisper: " + e.message); break; }
     }
-    LIVE.pending--; if (!LIVE.pending) { LIVE.interim = ""; drawTx(); }
-  });
+    LIVE.pending--; if (!LIVE.pending && !LIVE.caption) { LIVE.interim = ""; drawTx(); }
+  })();
 }
 
 function whisperLoop(stream, speaker, ms = 6000) {
@@ -421,6 +437,7 @@ function whisperLoop(stream, speaker, ms = 6000) {
 function stopListening() {
   LIVE.on = false; clearInterval(LIVE.tick);
   const r = LIVE.rec; LIVE.rec = null; try { r?.stop(); } catch { }
+  const c = LIVE.cap; LIVE.cap = null; try { c?.abort(); } catch { } LIVE.caption = "";
   (LIVE.mrs || []).forEach((m) => { try { m.state === "recording" && m.stop(); } catch { } }); LIVE.mrs = [];
   LIVE.stream?.getTracks().forEach((t) => t.stop()); LIVE.stream = null;
   LIVE.tab?.getTracks().forEach((t) => t.stop()); LIVE.tab = null;
